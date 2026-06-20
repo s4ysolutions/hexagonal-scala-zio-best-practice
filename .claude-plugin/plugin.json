@@ -1,0 +1,5 @@
+{
+  "name": "hexagonal-scala-zio-best-practices",
+  "version": "0.1.0",
+  "description": "Architecture skills for Scala 3 / ZIO 2 / Mill hexagonal architecture: domain modeling, layer separation, use-case scaffolding, ZIO-HTTP endpoints, TX-parameterized repositories, and composition root wiring."
+}
