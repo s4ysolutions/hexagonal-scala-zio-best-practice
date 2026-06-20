@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "hexagonal-scala-zio-best-practice",
+  "version": "0.1.0",
+  "description": "Architecture skills for Scala 3 / ZIO 2 / Mill hexagonal architecture",
+  "plugins": [
+    {
+      "name": "hexagonal-scala-zio-best-practices",
+      "description": "Architecture skills for Scala 3 / ZIO 2 / Mill hexagonal architecture: domain modeling, layer separation, use-case scaffolding, ZIO-HTTP endpoints, TX-parameterized repositories, and composition root wiring.",
+      "source": ".",
+      "category": "development"
+    }
+  ]
+}

@@ -8,7 +8,14 @@ Claude Code plugin. Architecture skills for **Scala 3 / ZIO 2 / Mill** hexagonal
 
 ### Option A — Project scope (recommended)
 
-Add the marketplace to your project's `.claude/settings.json`:
+From your project directory:
+
+```bash
+claude plugin marketplace add s4ysolutions/hexagonal-scala-zio-best-practice
+claude plugin install hexagonal-scala-zio-best-practices@hexagonal-scala-zio-best-practice --scope project
+```
+
+Or manually add the marketplace to `.claude/settings.json` then install:
 
 ```json
 {
@@ -21,12 +28,6 @@ Add the marketplace to your project's `.claude/settings.json`:
     }
   }
 }
-```
-
-Then install at project scope:
-
-```bash
-claude plugin install hexagonal-scala-zio-best-practices@hexagonal-scala-zio-best-practice --scope project
 ```
 
 Skills are then available as `hexagonal-scala-zio-best-practices:<skill-name>`.
