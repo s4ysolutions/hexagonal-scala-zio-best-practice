@@ -54,4 +54,3 @@ composition root          ← only place that knows all of the above
 
 **Multiple composition roots** — one per deployable artifact is fine; one per feature is a red flag that feature boundaries are leaking.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

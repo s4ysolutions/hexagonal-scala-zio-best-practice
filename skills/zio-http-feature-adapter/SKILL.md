@@ -73,4 +73,3 @@ val routes =
 
 **`routesPublic` returning authenticated routes** — route/middleware split must be enforced; the compiler catches this only if auth routes have a non-`Any` environment type.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

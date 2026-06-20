@@ -183,4 +183,3 @@ appear in the composition root, extract them to the appropriate feature layer.
 in `core/tests`, not in any production module, so they don't pollute the
 production dependency graph.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

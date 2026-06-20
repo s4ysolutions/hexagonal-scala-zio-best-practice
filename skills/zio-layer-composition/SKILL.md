@@ -163,4 +163,3 @@ Invariant preserved: concrete infra classes (`UsersRepositoryPg`, `UsersReposito
 
 **`provide` / `provideSomeLayer` anywhere** — `provide` is banned. `provideSomeLayer` inside a use case is doubly wrong: use cases must not self-wire, and auto-resolution hides dependency bugs. Use explicit `>>>` / `++` at the composition root only.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

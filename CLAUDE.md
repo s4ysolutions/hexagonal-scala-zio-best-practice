@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Repo Is
 
-Claude Code plugin (`hexagonal-scala-zio-best-practices`) extracted from a Scala/ZIO hexagonal-architecture project. Skills are drafted here and reviewed before the plugin is installed.
+Claude Code plugin (`hexagonal-scala-zio-best-practices`) for Scala/ZIO hexagonal-architecture projects.
 
 No build system. No runnable code. Each skill is a standalone `SKILL.md` file.
 
@@ -73,14 +73,20 @@ When revising a skill, check:
 - Are code examples consistent with the ZIO 2.x / Scala 3 / Mill 1.x stack?
 - Does the skill avoid the retired term "domain service"?
 
-All skills carry `⚠️ TESTING PENDING` until pressure-tested with a subagent.
-
 ## Install
 
-```bash
-# Install plugin (all skills namespaced as hexagonal-scala-zio-best-practices:<skill-name>)
-claude plugin install ~/s4y/skills-draft
+Add marketplace to `.claude/settings.json`:
 
-# Install single skill manually (legacy)
-cp -r ~/s4y/skills-draft/skills/<skill-name> ~/.claude/skills/
+```json
+{
+  "extraKnownMarketplaces": {
+    "hexagonal-scala-zio-best-practice": {
+      "source": { "source": "github", "repo": "s4ysolutions/hexagonal-scala-zio-best-practice" }
+    }
+  }
+}
+```
+
+```bash
+claude plugin install hexagonal-scala-zio-best-practices@hexagonal-scala-zio-best-practice --scope project
 ```

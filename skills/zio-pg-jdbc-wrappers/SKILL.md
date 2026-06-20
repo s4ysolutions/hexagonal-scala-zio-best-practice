@@ -110,4 +110,3 @@ class UsersRepositoryPg extends UsersRepository[TransactionContextPg]:
 
 **`mapResult` doing I/O** — if the mapper fetches additional data (N+1), use a JOIN in SQL instead.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

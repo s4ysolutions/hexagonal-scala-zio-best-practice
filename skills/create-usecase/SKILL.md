@@ -273,4 +273,3 @@ object ProvidersRoutes:
 - [ ] Layer wired with `>>>` / `++`; no `provide` / `provideSomeLayer` at composition root
 - [ ] Presentation injects `UseCase[C]`, never the concrete class
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

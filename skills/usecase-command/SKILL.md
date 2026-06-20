@@ -161,4 +161,3 @@ If a ZIO route needs this in the layer graph: `ZLayer.succeed(summon[UseCase[Get
 
 **Command carries auth token for the use case to verify** — auth is a cross-cutting aspect applied by middleware, not a use-case parameter.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

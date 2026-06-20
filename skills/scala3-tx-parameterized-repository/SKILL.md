@@ -81,4 +81,3 @@ val memLayer: TransactionManager[TXM] = TransactionManagerMemory.layer
 
 **`using ctx: TX` forgotten on repo method** — the method compiles but silently ignores the transaction context; the connection is fetched from a different source.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

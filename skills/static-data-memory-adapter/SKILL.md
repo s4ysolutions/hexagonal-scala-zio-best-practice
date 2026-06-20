@@ -66,4 +66,3 @@ val repoLayer: ULayer[LanguagesRepository[TXM]] = LanguagesRepositoryMemory.laye
 
 **Treating "static" as "never changes across deploys"** — if a DB of record exists (e.g. a languages table), the memory adapter's hardcoded list must be regenerated on deploy whenever that table changes. Static means "does not change while the process is running," not "never changes in production."
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

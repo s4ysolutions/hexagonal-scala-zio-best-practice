@@ -81,4 +81,3 @@ pg_prove pgsql/auth/test/*.sql
 
 **Numbers without gaps** — use gaps (10, 20, ...) to allow insertions between existing migrations.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

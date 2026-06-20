@@ -95,4 +95,3 @@ why they must never wrap a value that requires an effectful lookup to
 validate (e.g. "this `Email` must not already be registered" is a Workflow
 concern — it needs a repository — not something `Assertion` can express).
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

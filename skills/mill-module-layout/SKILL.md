@@ -313,4 +313,3 @@ appears in `feature.domain.mvnDeps`, move the offending file to the `workflows` 
 port interfaces, it must declare `myFeature.domain.workflows` in `moduleDeps`. A dep on
 `myFeature.domain` alone is missing the port interface definitions.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

@@ -104,4 +104,3 @@ must live in `domain.workflows` or deeper.
 
 **App service controlling concrete TX type** — which transaction implementation is used is a composition-root decision, not an app decision.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

@@ -110,4 +110,3 @@ Extract the literal text and verify it exists in the module's `.i18n` file.
 
 **Cross-module fallback** — if `t"..."` key is not in the module's bundle, it silently returns the raw key at runtime. No compile error.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet.

@@ -138,4 +138,3 @@ without benefit. Use packages.
 **Naming the effectful sub-module `feature.domain.core`** — "core" implies a more
 fundamental module, but it would be the effectful one (ZIO). Use `feature.domain.workflows`.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

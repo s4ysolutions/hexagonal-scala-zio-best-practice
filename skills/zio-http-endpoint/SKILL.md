@@ -196,4 +196,3 @@ Order matters: the rightmost `@@` is the outermost layer. `BrowserLocale` applie
 
 **Middleware applied inside `routesAuth`** — middleware belongs at the composition root so all adapters share the same auth uniformly.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

@@ -69,4 +69,3 @@ enum RegisterError:
 
 **Mutable VO for performance** — use immutable types by default; optimize only when measured.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

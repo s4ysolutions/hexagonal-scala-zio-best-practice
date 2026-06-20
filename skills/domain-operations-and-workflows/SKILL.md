@@ -285,4 +285,3 @@ assumed transaction bodies are pure data fetches, which is too narrow.
 requests, external API gateways. These hold a DB connection and lock for the full
 duration. Keep transactions to fast, local port calls (DB reads/writes).
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.

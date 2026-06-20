@@ -67,4 +67,3 @@ Endpoints are **named, typed values** that the HTTP orchestrator can thread thro
 
 **Route calls repository directly** — the route maps HTTP ↔ command; business calls go through the use case.
 
-> ⚠️ TESTING PENDING — not pressure-tested yet. Install only after review.
