@@ -3,6 +3,10 @@
   "name": "hexagonal-scala-zio-best-practice",
   "version": "0.1.0",
   "description": "Architecture skills for Scala 3 / ZIO 2 / Mill hexagonal architecture",
+  "owner": {
+    "name": "s4ysolutions",
+    "email": "sergey.dolin@teracloud.com"
+  },
   "plugins": [
     {
       "name": "hexagonal-scala-zio-best-practices",
