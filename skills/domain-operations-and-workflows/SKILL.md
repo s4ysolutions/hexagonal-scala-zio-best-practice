@@ -98,7 +98,10 @@ already requires.
 Raw `Throwable` is banned. `InfraFailure` (declared in `core.domain.errors`)
 is allowed and expected — adapters convert raw exceptions into it before crossing the port
 boundary, so above the port the error is typed and the workflow can reason about it normally.
-`E` may be a single type or a union (`InfraFailure | DomainError`).
+`E` may be a single type or a union (`InfraFailure | DomainError`). This applies to the
+port trait itself, not just the workflow that calls it — a port method typed `Task[A]`
+(`ZIO[Any, Throwable, A]`) already violates this rule before any workflow touches it,
+regardless of which transport (HTTP client, JDBC, gRPC, ...) the adapter wraps.
 
 **The testing litmus test** — if testing a piece of domain logic requires a
 mock, stub, or `ZLayer.succeed(...)`, it is a Workflow, not an Operation. An
