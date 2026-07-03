@@ -31,7 +31,7 @@ openAPI = OpenAPIGen.fromEndpoints(..., endpoint, ...)
 def endpoint(prefix: PathCodec[Unit]): GetLanguagesEndpoint =
   Endpoint(GET / prefix / "languages")
     .tag("Vocabla")
-    .out[GetLanguagesResponseDto]
+    .out[GetLanguagesResponse]
     .outError[InternalServerError500](Status.InternalServerError)
 ```
 
@@ -43,10 +43,16 @@ def route(endpoint: GetLanguagesEndpoint,
           useCase: UseCase[GetLanguagesCommand]): Route[Any, Response] =
   endpoint.implement { _ =>
     useCase(new GetLanguagesCommand())
-      .map { r => GetLanguagesResponseDto(...) }
+      .map { r => GetLanguagesResponse(...) }
       .mapError { case InfraFailure(_,_) => InternalServerError500("...") }
   }
 ```
+
+## Naming the DTO Type (zio-schema / OpenAPI)
+
+zio-http derives the OpenAPI component name from the Scala class name (`TypeId`) — there is no annotation that renames the type for OpenAPI while keeping a different class name (`@AvroAnnotations.name` exists but is Avro-codec-only and ignored by OpenAPI gen). A DTO called `GetLanguagesResponseDto` therefore shows up in the generated spec as `GetLanguagesResponseDto`, leaking implementation naming into the public contract.
+
+**Fix:** name the DTO the same as the domain concept (`GetLanguagesResponse`, not `GetLanguagesResponseDto`) and let the package qualify it — `s4y.vocabla.contracts.http.LanguagesContract.GetLanguagesResponse` vs. the domain type in `s4y.vocabla.domain`. Where a call site needs both in scope, alias the import for local clarity: `import ...LanguagesContract.GetLanguagesResponse as GetLanguagesResponseDto`.
 
 ## Why Separate
 

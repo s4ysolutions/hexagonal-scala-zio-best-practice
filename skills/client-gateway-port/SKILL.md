@@ -55,7 +55,7 @@ package s4y.vocabla.client.http
 
 import s4y.http.gateway.HttpGateway
 import s4y.vocabla.contracts.http.LanguagesContract
-import s4y.vocabla.contracts.http.LanguagesContract.GetLanguagesResponseDto
+import s4y.vocabla.contracts.http.LanguagesContract.GetLanguagesResponse as GetLanguagesResponseDto
 import zio.schema.codec.JsonCodec
 import zio.{IO, ZIO}
 
