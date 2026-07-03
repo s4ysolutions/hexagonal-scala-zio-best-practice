@@ -107,6 +107,15 @@ a double on something believed to be "just a domain service" is the signal
 that an effect was smuggled in; re-type it as a Workflow with the relevant
 port showing up in `R` rather than wiring a double around it.
 
+This classification also picks the test runtime: an Operation needs no effect
+runtime to test, so it belongs in a plain/munit test module; a Workflow needs
+one to drive its `ZIO[R, E, A]`, so it belongs in an effect-runtime (e.g.
+zio-test) test module. See `mill-module-layout`'s test sub-module table for
+the concrete module split. A domain test suite pulling in the effect-test
+framework to test something with no effect type in its signature is the same
+smuggled-effect smell as reaching for a mock — the fix is moving the suite to
+the plain-test module, not adding a runtime dependency to prove purity.
+
 ## Checklist
 
 - [ ] Operation constructor (if any) holds only pure values — no ports, no services, no effectful dependencies
