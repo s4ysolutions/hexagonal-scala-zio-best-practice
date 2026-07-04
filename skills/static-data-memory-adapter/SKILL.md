@@ -66,3 +66,37 @@ val repoLayer: ULayer[LanguagesRepository[TXM]] = LanguagesRepositoryMemory.laye
 
 **Treating "static" as "never changes across deploys"** — if a DB of record exists (e.g. a languages table), the memory adapter's hardcoded list must be regenerated on deploy whenever that table changes. Static means "does not change while the process is running," not "never changes in production."
 
+**No uniqueness check on the hardcoded list's key** — a hand-maintained
+`Chunk`/`List` of records has no schema to enforce a unique key the way a DB
+table's primary key would. A duplicate (or near-duplicate — e.g. one
+degraded entry with missing fields and one correct entry, same code) sits
+silently in the list; lookups using `.find` return whichever one comes
+first, and the bug only surfaces as "why is this field empty sometimes."
+
+```scala
+// WRONG — "en" appears twice; getLang("en") silently returns whichever
+// the .find hits first, which may be the incomplete one
+Chunk(
+  Lang("en", "🇬🇧", "English"),                 // added early, incomplete
+  ...
+  Lang("en", "🇬🇧", "English", "English", Some("en"), Some("eng"), 14000, 14000),
+  ...
+)
+```
+
+Guard this either by constructing the static list as a `Map` keyed by the
+lookup field (a duplicate key is then a compile-time-visible collision at
+construction, or at minimum overwrites instead of silently coexisting), or
+by adding a one-line test that asserts key uniqueness:
+
+```scala
+test("static language list has no duplicate codes") {
+  val codes = LanguagesRepositoryMemory.staticList.map(_.code)
+  assertTrue(codes.distinct.size == codes.size)
+}
+```
+
+This class of bug is easy to introduce (copy-paste a stub entry, add the
+real one later, forget to remove the stub) and easy to miss in review
+because both entries look individually correct.
+

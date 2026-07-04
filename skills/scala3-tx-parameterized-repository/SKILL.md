@@ -81,3 +81,35 @@ val memLayer: TransactionManager[TXM] = TransactionManagerMemory.layer
 
 **`using ctx: TX` forgotten on repo method** — the method compiles but silently ignores the transaction context; the connection is fetched from a different source.
 
+**`zipPar` (or any parallel combinator) on repository calls inside one `TX`**
+— a single `TransactionContext` typically wraps a single connection (one
+JDBC `Connection`, one prepared statement pipeline); calls inside the same
+transaction body are expected to run sequentially. `zipPar`-ing multiple
+`repo.someCall(...)` invocations inside `transactionManager.transaction { ... }`
+compiles and passes against a memory adapter (no real connection to
+contend over) but is a latent bug against any real single-connection TX
+implementation — concurrent statements racing on one connection.
+
+```scala
+// WRONG — three repo calls in parallel inside one TX; fine on
+// TransactionContextMemory, broken the moment TX = TransactionContextPg
+transactionManager.transaction("get languages") {
+  (repo.getLangs zipPar (repo.getLang("en") zipPar repo.getLang("unk")))
+    .map { case (langs, (default, unknown)) => ... }
+}
+
+// CORRECT — one repo call, rest is pure computation over the result
+transactionManager.transaction("get languages") {
+  repo.getLangs.map { langs =>
+    LanguagesDescriptor(pickDefault(langs), pickUnknown(langs), langs)
+  }
+}
+```
+
+Often the actual fix isn't "make it sequential" but "don't re-fetch via the
+port at all" — if the data needed by the second/third call is already
+present in the first call's result, compute it with a pure Domain Operation
+instead (see `domain-operations-and-workflows`'s "Workflow that should be an
+Operation" mistake). The memory adapter masking this is itself worth
+flagging — see `static-data-memory-adapter`.
+

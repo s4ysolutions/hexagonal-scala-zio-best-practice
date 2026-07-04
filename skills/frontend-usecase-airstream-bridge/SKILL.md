@@ -21,13 +21,22 @@ The use case's `E` channel must already be folded to `Nothing` before crossing t
 ```scala
 package s4y.vocabla.frontend
 
-import zio.{Runtime, UIO, Unsafe}
+import org.scalajs.dom
+import zio.{Runtime, UIO, Unsafe, ZIO}
 
 object ZioBridge:
   def run(effect: UIO[Unit])(using runtime: Runtime[Any]): Unit =
     Unsafe.unsafe { implicit unsafe =>
-      val _ = runtime.unsafe.runToFuture(effect)
+      val _ = runtime.unsafe.runToFuture(logDefects(effect))
     }
+
+  // runToFuture surfaces a defect as a failed Future; a caller that then
+  // discards the Future (as `run` does) loses it with no trace. Log it
+  // here, once, centrally — see Common Mistakes below.
+  private def logDefects[A](effect: UIO[A]): UIO[A] =
+    effect.tapDefect(cause =>
+      ZIO.succeed(dom.console.error("ZioBridge defect:", cause.prettyPrint))
+    )
 ```
 
 ```scala
@@ -120,6 +129,8 @@ Each `reload.events` emission rebuilds the inner effect from scratch (so `toEven
 **Forgetting the `ExecutionContext` for shape B/C.** `EventStream.fromFuture` fails to compile without one in scope (`Cannot find an implicit ExecutionContext`). Don't reach for `scala.concurrent.ExecutionContext.Implicits.global` per call site — define one `given ExecutionContext = JSExecutionContext.queue` in the composition root alongside `given Runtime[Any]`, same lifetime, same place.
 
 **Bridging a non-`UIO` effect.** `ZioBridge.run` and `toEventStream` both require `E = Nothing`. If a call site still has a real error channel, fold it (`.fold` / `.catchAll`) *before* the bridge, not after — the whole point is that nothing can be lost by launching fire-and-forget.
+
+**Folding `E` to `Nothing` and assuming that covers all failure modes.** Folding the error channel handles *expected* failures (a gateway returning `InfraFailure`), but a defect (`ZIO.die`, an uncaught exception inside a `.map`/`.fold` callback) is a *different* channel — `UIO[A]` still means "`E = Nothing`", not "cannot fail at all." `runToFuture` turns a defect into a failed `Future`; `ZioBridge.run` discards that `Future`, so the defect vanishes with no stack trace, no console error, nothing — and Scala.js has no unhandled-rejection reporting to catch it for you. `toEventStream`'s case is milder (Airstream logs an unhandled stream error by default) but still worth being explicit about. Tap defects centrally in the bridge (`effect.tapDefect(...)` logging to console), not per call site — see the `run` implementation above.
 
 **Assuming `flatMapSwitch` interrupts the ZIO fiber.** It only detaches the *stream* — the previous ZIO effect (e.g. an in-flight HTTP GET) keeps running to completion in the background; its result is just discarded. Harmless for idempotent GETs. If a stale request must actually stop (e.g. a mutating call), keep the `Fiber` from `runtime.unsafe.fork` and `interrupt` it explicitly instead of relying on Airstream to cancel anything.
 

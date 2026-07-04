@@ -73,11 +73,12 @@ cp -r skills/<skill-name> ~/.claude/skills/
 | [zio-http-feature-adapter](skills/zio-http-feature-adapter/SKILL.md) | `XxxZioHttp` + `XxxEndpoints`, `routesPublic`/`routesAuth` split |
 | [zio-http-endpoint](skills/zio-http-endpoint/SKILL.md) | individual `Endpoint[...]` definition, DTOs + Schema, domain→HTTP error mapping, middleware context |
 | [zio-pg-jdbc-wrappers](skills/zio-pg-jdbc-wrappers/SKILL.md) | `pgSelectMany`/`pgInsertOne`/… with `ZIO.scoped`, `using ctx`, `mapThrowable` |
-| [zio-prelude-domain-patterns](skills/zio-prelude-domain-patterns/SKILL.md) | `Validation` vs `Either`, `Subtype`/`Newtype` refinement, `Equal`/`Ord` for domain types |
+| [zio-prelude-domain-patterns](skills/zio-prelude-domain-patterns/SKILL.md) | `Validation` vs `Either`, `Subtype`/`Newtype` refinement, plain `Newtype` for identity-only fields, `Equal`/`Ord` for domain types |
 
 ### Frontend (Scala.js)
 
 | Skill | Purpose |
 |-------|---------|
 | [client-gateway-port](skills/client-gateway-port/SKILL.md) | frontend half of the hexagon, HTTP client gateway port + adapter, no TX parameter |
+| [client-gateway-jvm-contract-test](skills/client-gateway-jvm-contract-test/SKILL.md) | JVM-side real server + real client round-trip test that catches contract/path drift a browser test would also catch, without a browser |
 | [frontend-usecase-airstream-bridge](skills/frontend-usecase-airstream-bridge/SKILL.md) | bridging a ZIO effect into an Airstream `Signal`/`EventStream`: `Var` + fire-and-forget vs `fromFuture` one-shot vs `EventBus` + `flatMapSwitch` |

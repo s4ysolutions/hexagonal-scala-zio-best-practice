@@ -154,6 +154,49 @@ needs a `ZLayer` to be testable, the fix is not a better mock, it's
 recognizing the thing has a port dependency and belongs in the Workflow
 bucket with that port in `R`.
 
+**Workflow re-fetches via a port what the caller already has** — a Workflow
+that takes a `Repository[TX]` and calls it again to derive a value from data
+the caller already fetched (or could fetch once) is doing I/O for no reason,
+and often ends up `zipPar`'d against a sibling call for "performance,"
+which is exactly the trap `scala3-tx-parameterized-repository` warns about
+(parallel calls sharing one TX/connection).
+
+```scala
+// WRONG — 3 repo round-trips in one use case; two of them (defaultLang,
+// unknownLang) could be derived from the getLangs result with zero I/O
+object LanguagesWorkflows:
+  def defaultLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
+    repo.getLang("en").map(_.getOrElse(fallback))
+  def unknownLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
+    repo.getLang("unk").map(_.getOrElse(fallback))
+
+// use case
+transactionManager.transaction("get languages") {
+  repo.getLangs zipPar (LanguagesWorkflows.defaultLang(repo) zipPar LanguagesWorkflows.unknownLang(repo))
+}
+
+// CORRECT — one repo call; picking default/unknown from the result is pure
+object LanguagesOperations:
+  def defaultLang(langs: Chunk[Lang]): Lang =
+    langs.find(_.code == defaultCode).getOrElse(defaultFallback)
+  def unknownLang(langs: Chunk[Lang]): Lang =
+    langs.find(_.code == unknownCode).getOrElse(unknownFallback)
+
+// use case
+transactionManager.transaction("get languages") {
+  repo.getLangs.map(langs =>
+    LanguagesDescriptor(LanguagesOperations.defaultLang(langs), LanguagesOperations.unknownLang(langs), langs)
+  )
+}
+```
+
+The tell: if a Workflow's only reason to hold a port is to fetch a subset or
+derived view of data another call in the same use case already retrieves in
+full, it isn't a Workflow at all — collapse it to an Operation over the
+already-fetched value and delete the port calls. This also removes an entire
+`*Workflows` object and its test double from the codebase, not just a
+performance tweak.
+
 **Extracting workflow logic into a trait to enable test stubbing** — if a
 function calling a driven port is wrapped in a trait so callers can inject a
 stub, the stub sits at the wrong level. The driven port (`UsageRepository`,
