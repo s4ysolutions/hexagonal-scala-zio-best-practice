@@ -6,7 +6,7 @@ tags: [architecture, language-agnostic, framework-agnostic]
 
 # Use Case / Command Pattern
 
-**Scope:** language-agnostic pattern; ZIO-specific signatures shown below
+**Scope:** language-agnostic pattern; ZIO-specific signatures shown below. **Backend only** — frontend (Scala.js) use cases are a different concept (class owning UI state, bridging ZIO into Airstream, no Command/UseCase[C], no TX); see `frontend-usecase-airstream-bridge`.
 
 ## Overview
 

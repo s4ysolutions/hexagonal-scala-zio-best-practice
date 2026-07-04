@@ -41,6 +41,8 @@ See `domain-operations-and-workflows` for the operations/workflows split and the
 
 ## Dependency Rules
 
+Logical view only — the authoritative module-by-module dependency lists (incl. `core.*` deps and test sub-modules) are owned by `module-separation`; the domain/domain.workflows split decision is owned by `layers-to-modules`.
+
 | Layer (module) | May import | Must NOT import |
 |-------|-----------|----------------|
 | `domain` (VOs, operations) | other domain types, zio-prelude | app, infra, presentation, **any effect type** (`zio.ZIO`, `cats.effect.IO`) |

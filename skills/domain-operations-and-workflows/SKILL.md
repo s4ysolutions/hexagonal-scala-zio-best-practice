@@ -162,50 +162,29 @@ with one implementation and no infra variation is indirection with no payoff;
 collapse it to a static function in an object.
 
 ```scala
-// WRONG — trait wraps one driven port, exists only for stubbing
+// WRONG — trait with one impl, exists only so callers can stub it;
+// caller ends up holding both the repo AND the service wrapping the same repo
 trait AuthorizeService[TX <: TransactionContext]:
   def authorize(ctx: AuthorizeContext)(using TX): IO[InfraFailure, AuthorizeResult]
 
-object AuthorizeService:
-  def makeLive[TX <: TransactionContext: Tag](repo: UsageRepository[TX]) =
-    new AuthorizeService[TX]:
-      def authorize(ctx: AuthorizeContext)(using TX) =
-        Authorization.isUserSuper(ctx.userId).toZIO.orElse(
-          repo.used(ctx.userId, ctx.provider, QuotaPeriod.Hour(1)).map(Authorization.enoughQuota)
-        )
-
-// caller holds both the repo AND the service wrapping the same repo — duplication
-class TranslatorService[TX](usageRepository: UsageRepository[TX], authorizeService: AuthorizeService[TX], ...)
-
-// CORRECT — static function; fails on Denied so callers can use *> instead of flatMap
+// CORRECT — static function; fails with Denied so callers chain with *>
 object AuthorizeWorkflows:
   def authorize[TX <: TransactionContext](
       ctx: AuthorizeContext,
       usageRepository: UsageRepository[TX]
-  )(using TX): IO[InfraFailure | AuthorizeResult.Denied, Unit] =
-    AuthorizationOperations.isUserSuper(ctx.userId).toZIO.orElse(
-      usageRepository.used(ctx.userId, ctx.provider, QuotaPeriod.Hour(1))
-        .map(AuthorizationOperations.enoughQuota)
-    ).flatMap(_.toZIO).unit
+  )(using TX): IO[InfraFailure | AuthorizeResult.Denied, Unit] = ...
 
-// caller uses *> — no flatMap, no wrapping of Denied into a caller-owned error type
-object TranslatorWorkflows:
-  def translate[TX <: TransactionContext](...): IO[TranslationError | InfraFailure | AuthorizeResult.Denied, TranslationResponse] =
-    transactionManager.transaction("authorize") {
-      AuthorizeWorkflows.authorize(ctx, usageRepository)
-    } *> gateway.translate(request)
+// caller
+transactionManager.transaction("authorize") {
+  AuthorizeWorkflows.authorize(ctx, usageRepository)
+} *> gateway.translate(request)
 ```
 
-Return type `IO[InfraFailure | AuthorizeResult.Denied, Unit]` keeps `Denied` as a
-distinct error kind rather than wrapping it into a caller-owned type
-(`TranslationError.Unauthorized`). The presentation layer sees three separate error
-types and can map each to the correct HTTP status independently — no pattern-matching
-inside a wrapper enum.
-
-Test seam is `UsageRepository[TX]` — stub it with an in-memory implementation to
-exercise both `Authorized` and `Denied` paths. Stubbing `AuthorizeService` instead
-would test `TranslatorService`'s pattern-match in isolation, missing the actual
-authorization logic.
+Failing with `Denied` (instead of returning it) keeps it a distinct error kind — no
+wrapping into a caller-owned type like `TranslationError.Unauthorized`; presentation
+maps each error type to its HTTP status independently. Test seam is
+`UsageRepository[TX]` — stub it to exercise both paths; stubbing the wrapper trait
+would skip the actual authorization logic.
 
 ## Static Function vs ZIO Service for Workflows
 

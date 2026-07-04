@@ -97,20 +97,7 @@ object ProviderWorkflows:
     tm.transaction("list-providers") { repo.listAll(activeOnly) }
 ```
 
-**Shape B — ZIO service class (multiple callers or volatile deps):**
-
-```scala
-class ProviderWorkflows(/* non-TX deps here, e.g. config */):
-  def listProviders[TX <: TransactionContext: Tag](
-      activeOnly: Boolean,
-      repo: ProviderRepository[TX],
-      tm: TransactionManager[TX]
-  ): ZIO[Any, InfraFailure, List[Provider]] =
-    tm.transaction("list-providers") { repo.listAll(activeOnly) }
-
-object ProviderWorkflows:
-  val layer: ULayer[ProviderWorkflows] = ZLayer.succeed(new ProviderWorkflows())
-```
+**Shape B** — same method body, but non-TX deps move into the class constructor and a companion `layer` (`ZLayer.fromFunction`); see `domain-operations-and-workflows` § "Static Function vs ZIO Service for Workflows" for the full code.
 
 `R` = domain ports only. No infra type in `R`.
 TX-parameterized deps (`ProviderRepository[TX]`, `TransactionManager[TX]`) stay explicit in both shapes — they cannot be hidden because TX is fixed at the use-case level.
@@ -139,10 +126,8 @@ class GetProvidersUseCase[TX <: TransactionContext: Tag](
   def apply(command: GetProvidersCommand): IO[InfraFailure, List[Provider]] =
     ProviderWorkflows.listProviders[TX](command.activeOnly)
       .provide(ZLayer.succeed(tm), ZLayer.succeed(repo))
-      // ↑ local .provide is fine here: tm and repo are already constructed values
-      //   held as constructor fields — this is NOT the banned composition-root .provide;
-      //   the ban applies to building a layer graph from abstract types, not wrapping
-      //   concrete values already in hand.
+      // ↑ the one allowed .provide: wrapping already-constructed constructor
+      //   fields — see zio-layer-composition § "Never use provide" exception
 ```
 
 **Alternative — no workflow, inline orchestration (simple cases):**
@@ -183,31 +168,19 @@ object ProviderRepositoryPg:
 
 ```scala
 object GetProvidersUseCase:
-  // Shape 1 — thin companion, full wiring at composition root
+  // Shape 1 — thin companion, full wiring at composition root (default)
   def makeLayer[TX <: TransactionContext: Tag]
       : URLayer[TransactionManager[TX] & ProviderRepository[TX], UseCase[GetProvidersCommand]] =
     ZLayer.fromFunction(new GetProvidersUseCase[TX](_, _))
-
-  // Shape 2 — companion bundles internal structure, infra passed as param
-  // Use when multiple products share this use case with different infra
-  def bundledLayer[TX <: TransactionContext: Tag](
-      repoLayer: URLayer[Any, ProviderRepository[TX]]
-  ): URLayer[TransactionManager[TX], UseCase[GetProvidersCommand]] =
-    (ZLayer.service[TransactionManager[TX]] ++ repoLayer) >>> makeLayer[TX]
 ```
 
-Default: Shape 1. Switch to Shape 2 when the wiring structure is repeated across products.
+Shape 2 (`bundledLayer` — companion bundles the wiring structure, infra passed as param) exists for use cases shared across multiple products; full code in `zio-layer-composition` § "Wiring Shapes".
 
 ### 7. Composition root
 
 ```scala
-// Shape 1
 val getProvidersLayer: Layer[InfraFailure, UseCase[GetProvidersCommand]] =
   (txManagerLayer ++ ProviderRepositoryPg.layer) >>> GetProvidersUseCase.makeLayer[TXDB]
-
-// Shape 2
-val getProvidersLayer: Layer[InfraFailure, UseCase[GetProvidersCommand]] =
-  txManagerLayer >>> GetProvidersUseCase.bundledLayer(ProviderRepositoryPg.layer)
 ```
 
 ### 8. Presentation (route)
@@ -217,18 +190,22 @@ See `zio-http-endpoint` for the full pattern. Minimal shape:
 ```scala
 // feature/presentation/http/ProvidersRoutes.scala
 object ProvidersRoutes:
-  case class ProvidersResponseDto(...)
-  object ProvidersResponseDto:
-    given Schema[ProvidersResponseDto] = DeriveSchema.gen
+  // no Dto suffix — class name becomes the OpenAPI component name
+  // (rule owned by endpoint-contract-separation)
+  case class ProvidersResponse(...)
+  object ProvidersResponse:
+    given Schema[ProvidersResponse] = DeriveSchema.gen
 
   def endpoint(prefix: PathCodec[Unit]) =
     Endpoint(Method.GET / prefix / "providers")
       .tag("Providers")
-      .out[ProvidersResponseDto]
+      .out[ProvidersResponse]
 
-  def route(endpoint: ..., useCase: UseCase[GetProvidersCommand]): Route[Any, Nothing] =
+  def route(endpoint: ..., useCase: UseCase[GetProvidersCommand]): Route[Any, Response] =
     endpoint.implement(_ =>
-      ZIO.succeed(useCase(new GetProvidersCommand()).map(ProvidersResponseDto.fromDomain))
+      useCase(GetProvidersCommand(activeOnly = true))
+        .map(ProvidersResponse.fromDomain)
+        .mapError { case InfraFailure(_, _) => InternalServerError500("Internal error") }
     )
 ```
 

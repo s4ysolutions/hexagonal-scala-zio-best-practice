@@ -33,9 +33,9 @@ Name complex endpoint types with a type alias so the feature adapter class can r
 ```scala
 type TranslationEndpoint = Endpoint[
   Unit,
-  TranslationRequestDto,
+  TranslationRequest,
   InternalServerError500 | NotAuthorized401 | UnprocessableEntity422,
-  TranslationResponseDto,
+  TranslationResponse,
   AuthType.Bearer
 ]
 ```
@@ -46,8 +46,8 @@ type TranslationEndpoint = Endpoint[
 def endpoint(prefix: PathCodec[Unit]): TranslationEndpoint =
   Endpoint(Method.POST / prefix / "translation" ?? Doc.p("Translate text"))
     .tag("Translation")                        // OpenAPI tag grouping
-    .in[TranslationRequestDto](Doc.p("..."))   // request body + description
-    .out[TranslationResponseDto](Doc.p("...")) // success response
+    .in[TranslationRequest](Doc.p("..."))   // request body + description
+    .out[TranslationResponse](Doc.p("...")) // success response
     .auth(AuthType.Bearer)                     // omit for public endpoints
     .outErrors(httpCodec401, httpCodec422, httpCodec500)  // error codecs
     ?? Doc.p("Full endpoint description for OpenAPI")
@@ -84,26 +84,32 @@ Domain error → HTTP error mapping, done in route:
 
 ## DTOs and Schema
 
-DTOs live in the route object alongside the endpoint. Schema derivation co-located:
+DTOs live in the route object alongside the endpoint. Schema derivation co-located.
+Never suffix the class name with `Dto` — zio-http uses the class name as the OpenAPI
+component name and the suffix leaks into the public spec (rule owned by
+`endpoint-contract-separation`).
 
 ```scala
 object TranslationRouting:
 
-  case class TranslationRequestDto(text: String, to: String, mode: Option[String])
-  object TranslationRequestDto:
-    given Schema[TranslationRequestDto] = DeriveSchema.gen[TranslationRequestDto]
+  case class TranslationRequest(text: String, to: String, mode: Option[String])
+  object TranslationRequest:
+    given Schema[TranslationRequest] = DeriveSchema.gen[TranslationRequest]
 
-  case class TranslationResponseDto(translated: String, inputTokenCount: Int)
-  object TranslationResponseDto:
-    given Schema[TranslationResponseDto] = DeriveSchema.gen[TranslationResponseDto]
+  case class TranslationResponse(translated: String, inputTokenCount: Int)
+  object TranslationResponse:
+    given Schema[TranslationResponse] = DeriveSchema.gen[TranslationResponse]
 ```
 
 Mapper from domain → DTO on the DTO companion:
 
 ```scala
-object TranslationProviderDto:
-  given Schema[TranslationProviderDto] = DeriveSchema.gen[TranslationProviderDto]
-  def fromDomain(p: TranslationProvider): TranslationProviderDto = ...
+// DTO shares the domain concept's name; the package qualifies it (see
+// endpoint-contract-separation). Where both are in scope, alias the import:
+// import contracts.http.TranslationProvider as TranslationProviderDto
+object TranslationProvider:
+  given Schema[TranslationProvider] = DeriveSchema.gen[TranslationProvider]
+  def fromDomain(p: domain.TranslationProvider): TranslationProvider = ...
 ```
 
 Domain types never carry `Schema` — that annotation belongs in the presentation layer.
@@ -130,7 +136,7 @@ def route(
                              UnprocessableEntity422(NonEmptyChunk(s"Unknown provider: $p"))
                          }
         endTime     <- Clock.instant
-      yield TranslationResponseDto(result.translated, result.inputTokenCount, ...)
+      yield TranslationResponse(result.translated, result.inputTokenCount, ...)
     }
   }
 ```

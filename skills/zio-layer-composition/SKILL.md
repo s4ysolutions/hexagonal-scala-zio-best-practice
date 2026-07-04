@@ -95,6 +95,8 @@ Use when the constructor is a straightforward field injection. Use `fromFunction
 
 **Never use `provide` for layer wiring.** `provide` auto-resolves the dependency graph by type — if two layers satisfy the same type, the selection is implicit and the error appears far from the source. Always wire explicitly with `>>>` (sequential) and `++` (additive); the graph is then visible in code and any missing dependency is a compile error at the exact wiring site.
 
+**The one allowed exception:** a local `.provide(ZLayer.succeed(x), ...)` where `x` is an already-constructed value held in hand (e.g. a constructor field being passed into a workflow's `R`). No graph is being auto-resolved — the value exists; `ZLayer.succeed` just adapts it. The ban targets building a dependency graph from abstract types, not wrapping concrete values.
+
 ```scala
 // WRONG — auto-wiring, silent ambiguity risk
 myApp.provide(useCaseLayer, repoLayer, txManagerLayer, dataSourceLayer)
@@ -110,15 +112,9 @@ myApp.provideLayer(appLayer)
 Two valid shapes. Choose by how many products share the same use case.
 
 **Shape 1 — thin use case, wiring at composition root.**
-Use case `makeLayer` declares its deps; product wires the full graph.
+Use case `makeLayer` (shown above in "makeLayer Companion Convention") declares its deps; product wires the full graph.
 
 ```scala
-// use case companion — declares deps only
-object RegisterUserUseCase:
-  def makeLayer[TX: zio.Tag]
-      : URLayer[TransactionManager[TX] & UsersRepository[TX], UseCase[RegisterCommand]] =
-    ZLayer.fromFunction(new RegisterUserUseCase[TX](_, _))
-
 // product (composition root) — wires the full graph
 val appLayer: Layer[InfraFailure, UseCase[RegisterCommand]] =
   (txManagerLayer ++ UsersRepositoryPg.layer) >>> RegisterUserUseCase.makeLayer[TXDB]
@@ -133,10 +129,7 @@ Reduces duplication when multiple products share the same use case.
 ```scala
 // use case companion — owns wiring structure, infra layers are params
 object RegisterUserUseCase:
-  def makeLayer[TX: zio.Tag]
-      : URLayer[TransactionManager[TX] & UsersRepository[TX], UseCase[RegisterCommand]] =
-    ZLayer.fromFunction(new RegisterUserUseCase[TX](_, _))
-
+  // makeLayer as in Shape 1, plus:
   def bundledLayer[TX: zio.Tag](
       repoLayer: URLayer[Any, UsersRepository[TX]]   // caller supplies concrete infra
   ): URLayer[TransactionManager[TX], UseCase[RegisterCommand]] =
