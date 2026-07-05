@@ -1,6 +1,6 @@
 ---
 name: mill-module-layout
-description: Use when setting up or extending a Mill build for a hexagonal/clean-architecture Scala project, when asked to create or scaffold a new Mill module (e.g. features.myFeature.infra.pg or features.myFeature.domain), when deciding how to declare moduleDeps for a new module, when adding a test sub-module in Mill, or when wiring a new bounded context into an existing Mill build
+description: Use when setting up or extending a Mill build for a hexagonal/clean-architecture Scala project, when asked to create or scaffold a new Mill module (e.g. features.myFeature.infra.pg or features.myFeature.domain), when deciding how to declare moduleDeps for a new module, when adding a test sub-module in Mill, when wiring a new bounded context into an existing Mill build, or when cross-compiling a module to Scala.js via a nested "twin" module (e.g. errorsJs, voJs)
 tags: [mill, scala, build-tool, architecture]
 ---
 
@@ -121,6 +121,51 @@ object core extends Module {
   }
 }
 ```
+
+## Scala.js Twin Modules (Cross-Compilation)
+
+When a module needs to compile to both JVM and Scala.js (e.g. `domain.vo` in
+`layers-to-modules`' three-way split), do not duplicate its source files.
+Instead nest a **twin module** that has no source files of its own — it pulls
+in the JVM sibling's sources via `Task` and recompiles them under
+`ScalaJSModule`:
+
+```scala
+object errors extends BaseModule {
+  override def mvnDeps: T[Seq[Dep]] = Seq(zioDep)
+
+  object errorsJs extends BaseJsModule {
+    override def sources = Task { errors.sources() ++ super.sources() }
+    override def mvnDeps: T[Seq[Dep]] = Seq(zioJsDep)  // JS-cross-built artifact, not zioDep
+  }
+}
+```
+
+Rules for this pattern:
+
+- The twin is always nested inside the JVM/cross-platform module it mirrors
+  (`errors.errorsJs`, `identity.identityJs`, `domain.vo.voJs`), never a sibling
+  at the same nesting level — this is what makes `sources = Task { errors.sources() ++ super.sources() }` resolvable.
+- `sources` is overridden to reuse the parent's files, not to declare a second
+  copy. There is no `.js`-suffixed source directory to maintain — one set of
+  `.scala` files, two compile targets.
+- `mvnDeps` on the twin swaps every JVM dependency for its Scala.js-published
+  counterpart (`preludeDep` → `preludeJsDep`, `zioDep` → `zioJsDep`,
+  `zioSchemaDerivationDep` → `zioSchemaDerivationJsDep`). These are different
+  artifacts on Maven, not the same jar — get this wrong and the twin fails to
+  resolve or link.
+- `moduleDeps` on the twin points at the **other twins**, not the JVM
+  originals: `vo.voJs` depends on `core.identity.identityJs` and
+  `features.auth.domain.domainJs`, never on `core.identity` or
+  `features.auth.domain` directly. A JVM-only dep here breaks the JS link step
+  even though `mill compile` may look fine in isolation.
+- Name the twin `<parent><Js>` (`errorsJs`, `identityJs`, `voJs`, `httpJs`,
+  `domainJs`, `appJs`, `gatewayJs`) — consistent enough to grep for every
+  cross-compiled module in the build.
+
+This is orthogonal to the `BaseJvmModule` vs `BaseModule` split: a module that
+needs a JS twin extends plain `BaseModule` (no JVM-only deps of its own) and
+gets the JS artifact as a nested `BaseJsModule`, not a replacement.
 
 ## Feature Module Declaration
 
@@ -312,4 +357,19 @@ appears in `feature.domain.mvnDeps`, move the offending file to the `workflows` 
 **Infra or app depending on `myFeature.domain` only** — if a module implements or calls
 port interfaces, it must declare `myFeature.domain.workflows` in `moduleDeps`. A dep on
 `myFeature.domain` alone is missing the port interface definitions.
+
+**JS twin's `moduleDeps` pointing at the JVM module instead of the sibling twin** —
+`vo.voJs` must depend on `identity.identityJs`, not `identity`. Pointing at the
+JVM original compiles fine under plain `mill compile` (Mill doesn't cross-check
+platform) but fails at the Scala.js link step, or silently pulls a JVM-only
+transitive dependency into the browser bundle.
+
+**Giving the JS twin its own source directory instead of reusing `sources`** —
+duplicating files invites drift between JVM and JS versions of the same type.
+The twin should have zero files of its own; `override def sources = Task { parent.sources() ++ super.sources() }` is what keeps one source of truth.
+
+**Using the JVM dep instead of the `*Js`-suffixed one in the twin's `mvnDeps`** —
+`preludeDep` and `preludeJsDep` are different published artifacts. Copy-pasting
+the parent's `mvnDeps` into the twin without swapping suffixes fails resolution
+or produces a JVM classfile the Scala.js linker can't consume.
 
