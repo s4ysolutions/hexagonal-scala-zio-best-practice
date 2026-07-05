@@ -18,7 +18,31 @@ The frontend is a hexagon too. It has driven ports (fetch data from the backend)
 - An existing shared contract module (see [[endpoint-contract-separation]]) already defines the DTOs both sides use
 - Deciding where frontend fetch/decode code belongs relative to domain and contract modules
 
-Do NOT use for server-to-server calls (that's a regular repository/gateway port, TX-parameterized if it touches persistence) or for UI state management (Laminar signals, component wiring — out of scope).
+Do NOT use for server-to-server calls (that's a regular repository/gateway port, TX-parameterized if it touches persistence) or for UI state management (Laminar signals, component wiring — that's [[frontend-usecase-airstream-bridge]]).
+
+## The Frontend `core` Folder Mirrors the Backend Hexagon — Loosely
+
+A frontend build typically groups everything on this side of the ZIO/Airstream
+boundary under one `core` package, structured like the backend's layers, with
+names that drift slightly because "port" and "gateway" read more naturally
+than "repository" and "infra" for an outbound HTTP call:
+
+```
+core.ports       — driven port interfaces (this skill's "port")
+core.gateways    — adapters implementing a port (this skill's "adapter";
+                   "infra" would be the backend word for the same role)
+core.usecases    — s4y.app.UseCaseCommand + s4y.app.UseCase[C], the exact
+                   same trait as the backend ([[usecase-command]]) — not a
+                   frontend-specific reinvention, imported and used as-is
+```
+
+Don't be picky about the port/repository or gateway/adapter/infra naming
+divergence — it's the same role playing under a locally-preferred name, same
+way `Operations`/`Workflows` names a role rather than mandating a literal
+class name. What must **not** diverge is the `UseCaseCommand`/`UseCase[C]`
+shape itself in `core.usecases` — that one is worth keeping byte-for-byte
+identical to the backend so the frontend never invents a second application
+pattern.
 
 ## Module Layout
 
