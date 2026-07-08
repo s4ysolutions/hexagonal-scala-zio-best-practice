@@ -82,3 +82,4 @@ cp -r skills/<skill-name> ~/.claude/skills/
 | [client-gateway-port](skills/client-gateway-port/SKILL.md) | frontend half of the hexagon, HTTP client gateway port + adapter, no TX parameter |
 | [client-gateway-jvm-contract-test](skills/client-gateway-jvm-contract-test/SKILL.md) | JVM-side real server + real client round-trip test that catches contract/path drift a browser test would also catch, without a browser |
 | [frontend-usecase-airstream-bridge](skills/frontend-usecase-airstream-bridge/SKILL.md) | bridging a ZIO effect into an Airstream `Signal`/`EventStream`: `Var` + fire-and-forget vs `fromFuture` one-shot vs `EventBus` + `flatMapSwitch` |
+| [ui-component-container-pattern](skills/ui-component-container-pattern/SKILL.md) | container object alone at feature package root as the React-`index`-like entry, leaves demoted to `components/` |
