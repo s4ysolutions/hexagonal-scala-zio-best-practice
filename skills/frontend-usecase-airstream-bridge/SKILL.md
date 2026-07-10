@@ -1,6 +1,6 @@
 ---
 name: frontend-usecase-airstream-bridge
-description: Use when a Scala.js frontend use case must turn a ZIO effect into an Airstream Signal/EventStream for Laminar UI, when choosing between an imperative Var + fire-and-forget launch, a one-shot fromFuture signal, or an EventBus + flatMapSwitch reactive pipeline, or when deciding whether launching a ZIO fiber per UI event is too expensive
+description: Use when a Scala.js frontend use case must turn a ZIO effect into an Airstream Signal/EventStream for Laminar UI, when choosing among the reactive bridging strategies (imperative Var, one-shot fromFuture, EventBus pipeline), or when deciding whether launching a ZIO fiber per UI event is too expensive
 tags: [scala, scalajs, zio, airstream, frontend]
 ---
 
@@ -174,11 +174,25 @@ A first and only diverge when A visibly doesn't fit.
 
 **Forgetting the `ExecutionContext` for shape B/C.** `EventStream.fromFuture` fails to compile without one in scope (`Cannot find an implicit ExecutionContext`). Don't reach for `scala.concurrent.ExecutionContext.Implicits.global` per call site — define one `given ExecutionContext = JSExecutionContext.queue` in the composition root alongside `given Runtime[R]`, same lifetime, same place.
 
-**Generalizing the fold+bridge skeleton before a third repeat.** Every shape-A boundary object repeats the same four lines: fold the usecase's `E` into a local state case, call `ZioBridge.run`, done. It's tempting to collapse that into a generic helper (`onceZIO(command): Signal[LoadState[E, A]]`) the moment a second boundary object appears. Don't, until a **third** one repeats the exact shape — with one real usecase (or even two), the generic helper's own signature (a `UseCase[C]` given, a `Runtime[R]` given, an `ExecutionContext` given, a two-type-param `LoadState[E, A]`) costs more to read and trace than the four concrete lines it replaces. The concrete version is also easier to diverge from later (add a field to one boundary object's state without touching a shared generic type). Cost is asymmetric: collapsing three concrete repeats into a helper later is a cheap mechanical refactor; unwinding a helper that turned out wrong across N call sites is not. Wait for the third repeat.
+**Generalizing the fold+bridge skeleton before a third repeat.** Shape-A objects
+repeat four lines: fold `E` into a local state case, call `ZioBridge.run`, done.
+Don't collapse that into a generic helper (`onceZIO(command): Signal[LoadState[E, A]]`)
+until a **third** repeat of the exact shape — with one or two usecases the helper's
+own signature (givens for `UseCase[C]`, `Runtime[R]`, `ExecutionContext`, plus a
+two-param `LoadState[E, A]`) costs more to read than the concrete lines, and concrete
+is easier to diverge from later. Cost is asymmetric: collapsing three repeats later
+is mechanical; unwinding a wrong helper across N call sites is not.
 
 **Bridging a non-`UIO` effect.** `ZioBridge.run` and `toEventStream` both require `E = Nothing`. If a call site still has a real error channel, fold it (`.fold` / `.catchAll`) *before* the bridge, not after — the whole point is that nothing can be lost by launching fire-and-forget.
 
-**Folding `E` to `Nothing` and assuming that covers all failure modes.** Folding the error channel handles *expected* failures (a gateway returning `InfraFailure`), but a defect (`ZIO.die`, an uncaught exception inside a `.map`/`.fold` callback) is a *different* channel — `UIO[A]` still means "`E = Nothing`", not "cannot fail at all." `runToFuture` turns a defect into a failed `Future`; `ZioBridge.run` discards that `Future`, so the defect vanishes with no stack trace, no console error, nothing — and Scala.js has no unhandled-rejection reporting to catch it for you. `toEventStream`'s case is milder (Airstream logs an unhandled stream error by default) but still worth being explicit about. Tap defects centrally in the bridge (`effect.tapDefect(...)` logging to console), not per call site — see the `run` implementation above.
+**Folding `E` to `Nothing` and assuming that covers all failure modes.** Folding
+the error channel handles *expected* failures, but a defect (`ZIO.die`, an uncaught
+exception in a `.map`/`.fold` callback) is a *different* channel — `UIO[A]` means
+`E = Nothing`, not "cannot fail." `ZioBridge.run` discards the `Future` `runToFuture`
+produces, so a defect vanishes silently — no stack trace, no console error, and
+Scala.js has no unhandled-rejection reporting. (`toEventStream` is milder — Airstream
+logs unhandled stream errors.) Tap defects centrally in the bridge
+(`effect.tapDefect(...)`), not per call site.
 
 **Assuming `flatMapSwitch` interrupts the ZIO fiber.** It only detaches the *stream* — the previous ZIO effect (e.g. an in-flight HTTP GET) keeps running to completion in the background; its result is just discarded. Harmless for idempotent GETs. If a stale request must actually stop (e.g. a mutating call), keep the `Fiber` from `runtime.unsafe.fork` and `interrupt` it explicitly instead of relying on Airstream to cancel anything.
 

@@ -70,7 +70,7 @@ trait ProviderRepository[TX <: TransactionContext]:
 
 ### 3. Domain workflow (if business logic + port call)
 
-> ⚠️ **Stop and choose Shape A or B before writing code.** This decision is hard to reverse. See `domain-operations-and-workflows` § "Static Function vs ZIO Service for Workflows" for the full trade-off. Short version:
+> ⚠️ **Stop and choose Shape A or B before writing code.** This decision is hard to reverse. See `domain-operations-and-workflows` § "Choosing the Workflow Shape" for the full trade-off. Short version:
 > - **Shape A (static function)** — one caller today, stable deps → deps explicit in signature
 > - **Shape B (ZIO service class)** — multiple callers OR deps likely to grow → non-TX deps hidden in constructor + ZLayer
 
@@ -97,7 +97,7 @@ object ProviderWorkflows:
     tm.transaction("list-providers") { repo.listAll(activeOnly) }
 ```
 
-**Shape B** — same method body, but non-TX deps move into the class constructor and a companion `layer` (`ZLayer.fromFunction`); see `domain-operations-and-workflows` § "Static Function vs ZIO Service for Workflows" for the full code.
+**Shape B** — same method body, but non-TX deps move into the class constructor and a companion `layer` (`ZLayer.fromFunction`); see `domain-operations-and-workflows` § "Choosing the Workflow Shape" for the full code.
 
 `R` = domain ports only. No infra type in `R`.
 TX-parameterized deps (`ProviderRepository[TX]`, `TransactionManager[TX]`) stay explicit in both shapes — they cannot be hidden because TX is fixed at the use-case level.
@@ -127,7 +127,7 @@ class GetProvidersUseCase[TX <: TransactionContext: Tag](
     ProviderWorkflows.listProviders[TX](command.activeOnly)
       .provide(ZLayer.succeed(tm), ZLayer.succeed(repo))
       // ↑ the one allowed .provide: wrapping already-constructed constructor
-      //   fields — see zio-layer-composition § "Never use provide" exception
+      //   fields — see zio-layer-composition's "one allowed exception"
 ```
 
 **Alternative — no workflow, inline orchestration (simple cases):**

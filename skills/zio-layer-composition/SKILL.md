@@ -55,7 +55,16 @@ val httpLayer: Layer[InfraFailure, MyZioHttp] =
 
 ## `makeLayer` Companion Convention
 
-Each service exposes a `makeLayer` (or `layer`) in its companion object. The layer's input type documents the service's dependencies:
+Each service exposes its layer in the companion object. **The name encodes whether the layer is a stable value or built per call:**
+
+| Name | Form | Meaning |
+|------|------|---------|
+| `val layer` | value | one fixed layer — every reference is the same instance |
+| `def makeLayer[...](...)` | function | each call builds a **new** layer (takes type or term params, e.g. `[TX]`, an infra layer) |
+
+A layer parameterised by anything (a `TX` type, a passed-in dependency layer) cannot be a `val` — it is a function of its parameters, so it is `def makeLayer`. A layer with no parameters is a `val layer`. Reading the name alone tells you whether the result is shared or freshly constructed.
+
+The layer's input type documents the service's dependencies:
 
 ```scala
 object RegisterUserUseCase:
@@ -154,5 +163,5 @@ Invariant preserved: concrete infra classes (`UsersRepositoryPg`, `UsersReposito
 
 **`>>>` with incompatible types** — compiler error means the right-hand layer has a requirement the left-hand layer does not provide; check the `R` type of the downstream layer.
 
-**`provide` / `provideSomeLayer` anywhere** — `provide` is banned. `provideSomeLayer` inside a use case is doubly wrong: use cases must not self-wire, and auto-resolution hides dependency bugs. Use explicit `>>>` / `++` at the composition root only.
+**`provide` / `provideSomeLayer` for graph wiring** — banned (the sole exception is the local `.provide(ZLayer.succeed(x))` over an already-constructed value, per "The one allowed exception" above). `provideSomeLayer` inside a use case is doubly wrong: use cases must not self-wire, and auto-resolution hides dependency bugs. Wire the graph with explicit `>>>` / `++` at the composition root only.
 

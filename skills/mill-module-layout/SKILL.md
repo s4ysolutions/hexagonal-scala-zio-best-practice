@@ -1,6 +1,6 @@
 ---
 name: mill-module-layout
-description: Use when setting up or extending a Mill build for a hexagonal/clean-architecture Scala project, when asked to create or scaffold a new Mill module (e.g. features.myFeature.infra.pg or features.myFeature.domain), when deciding how to declare moduleDeps for a new module, when adding a test sub-module in Mill, when wiring a new bounded context into an existing Mill build, or when cross-compiling a module to Scala.js via a nested "twin" module (e.g. errorsJs, voJs)
+description: Use when setting up, extending, or scaffolding a Mill build for a hexagonal Scala project — new modules, declaring moduleDeps, adding a test sub-module, wiring a bounded context, or cross-compiling a module to Scala.js via a nested "twin" module
 tags: [mill, scala, build-tool, architecture]
 ---
 

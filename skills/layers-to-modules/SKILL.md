@@ -1,6 +1,6 @@
 ---
 name: layers-to-modules
-description: Use when deciding how many build modules a single hexagonal layer should map to, when asked to create a new domain sub-module (e.g. domain.operations or domain.workflows), when a domain module pulls in ZIO and you want to know if that is correct, or when naming sub-modules within a layer
+description: Use when deciding how many build modules a hexagonal layer maps to, when creating or naming a domain sub-module (domain.operations, domain.workflows), or when a domain module pulls in ZIO and you want to know if that is correct
 tags: [architecture, language-agnostic, build-system-agnostic]
 ---
 
@@ -169,7 +169,10 @@ without benefit. Use packages.
 **Naming the effectful sub-module `feature.domain.core`** — "core" implies a more
 fundamental module, but it would be the effectful one (ZIO). Use `feature.domain.workflows`.
 
-**Cross-compiling all of `feature.domain` because one VO needs to reach the frontend** — if `feature.domain` still bundles operations (and any JVM-only deps they pull in, e.g. an i18n resource loader), giving it a `*Js` variant either fails to compile on Scala.js or forces a JS-compatible substitute for a dependency that never needed one. Split `vo` out first; only `vo` gets the `*Js` variant.
-
-**Two-way split kept once a frontend needs the VOs, `operations` left inside `feature.domain`** — same problem from the other direction: `feature.domain` (now really `domain.vo`'s job) still carries `operations`, so cross-compiling it drags operations' JVM-only deps along. The three-way split isn't optional once real cross-compilation exists — it's what separates "the part a frontend imports" from "the part that must never be asked to."
+**Cross-compiling all of `feature.domain` because one VO needs the frontend** —
+bundling operations (and their JVM-only deps, e.g. an i18n loader) into the `*Js`
+variant either fails on Scala.js or forces a JS substitute for a dep that never
+needed one. Split `vo` out first; only `vo` gets the `*Js` variant. The three-way
+split (per "Three modules…" above) isn't optional once real cross-compilation
+exists.
 

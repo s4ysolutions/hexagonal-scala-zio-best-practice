@@ -81,7 +81,7 @@ final class GetProvidersCommand extends UseCaseCommand:
 object GetProvidersCommand:
   final class GetProvidersUseCase(gateways: TranslationGateways) extends UseCase[GetProvidersCommand]:
     def apply(cmd: GetProvidersCommand): NonEmptySet[TranslationProvider] = gateways.configured
-  def makeLayer: ZLayer[TranslationGateways, Nothing, UseCase[GetProvidersCommand]] =
+  val layer: ZLayer[TranslationGateways, Nothing, UseCase[GetProvidersCommand]] =
     ZLayer.fromFunction(GetProvidersUseCase(_))
 ```
 
@@ -110,7 +110,7 @@ class RegisterUserUseCase[TX <: TransactionContext](
 
 **Presentation depends only on `UseCase[C]`** — the route receives `UseCase[RegisterPublicKeyCommand]`, never `RegisterUserUseCase[TransactionContextPg]`. TX type and repo are invisible.
 
-**Use case owns the transaction boundary** — calling `TransactionManager.transaction { ... }` is an app-layer concern. Ports (repositories) are called inside that boundary.
+**The Workflow owns the transaction boundary, not the use case** — the workflow takes `TransactionManager[TX]` and calls `TransactionManager.transaction { ... }` itself, once per atomic unit it needs; the use case's `apply` is a pass-through that builds params and calls the workflow. Only a use case with no workflow at all (a single repo call, nothing to derive) may open the transaction directly. Rule and rationale owned by `domain-operations-and-workflows` § "Transactions".
 
 ## Wiring
 

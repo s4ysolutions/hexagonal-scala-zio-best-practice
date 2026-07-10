@@ -1,6 +1,6 @@
 ---
 name: client-gateway-jvm-contract-test
-description: Use when a client-gateway-port feature needs a regression test that catches contract drift between server route and client gateway (path segments, Schema encode/decode) without a browser, or when deciding whether a cross-compiled client module is worth the extra build targets
+description: Use when a client-gateway-port feature needs a regression test catching contract drift between server route and client gateway without a browser, or when deciding whether a cross-compiled client module is worth the extra build targets
 tags: [scala, zio, zio-http, testing, architecture]
 ---
 

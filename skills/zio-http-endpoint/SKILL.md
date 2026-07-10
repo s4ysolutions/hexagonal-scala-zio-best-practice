@@ -84,10 +84,9 @@ Domain error → HTTP error mapping, done in route:
 
 ## DTOs and Schema
 
-DTOs live in the route object alongside the endpoint. Schema derivation co-located.
-Never suffix the class name with `Dto` — zio-http uses the class name as the OpenAPI
-component name and the suffix leaks into the public spec (rule owned by
-`endpoint-contract-separation`).
+DTOs live in the route object alongside the endpoint, Schema derivation co-located.
+No `Dto` suffix on the class name — rule and rationale owned by
+`endpoint-contract-separation`.
 
 ```scala
 object TranslationRouting:

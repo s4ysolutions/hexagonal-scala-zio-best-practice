@@ -27,7 +27,7 @@ domain/workflows/        ← module: feature.domain.workflows (effectful — ZIO
 app/
   usecases/              Orchestration: builds params, calls the workflow; does
                          not open transactions itself (see `domain-operations-and-workflows`
-                         § "Transaction Ownership Lives in the Workflow, Not the Use Case")
+                         § "Transactions")
 infra/
   db/                    Driven adapter: persistent storage
   gateway/               Driven adapter: external APIs, third-party services
@@ -97,6 +97,10 @@ must live in `domain.workflows` or deeper.
 ## Common Mistakes
 
 **Transport errors in domain** — `RateLimitExceeded`, `DecodingFailed`, `NetworkError` are infra details. Domain errors express semantic intent: `QuotaExceeded`, `ServiceUnavailable`, `InvalidInput`. Infra adapters wrap raw errors into `InfraFailure` (from `core.domain.errors`) before returning — `InfraFailure` is the one typed wrapper that IS allowed in domain workflow `E`; specific library error types are not.
+
+The same test run in reverse also matters: a bespoke error enum whose every case gets collapsed into `InfraFailure` at every call site anyway (`EncryptFailed(msg)` / `DecryptFailed(msg)`, both just `.mapError(e => InfraFailure(e.getMessage))`) isn't a domain error either — it's ceremony with a domain-shaped name. If nothing branches on the cases, delete the enum and return `InfraFailure` directly; keep a distinct enum only when a caller genuinely reacts differently per case (e.g. a social-login `InvalidToken` vs `UnknownProvider` mapping to different HTTP statuses).
+
+**Port result/error type as a standalone file in `ports/`** — a type describing what one port's method returns or fails with (`ResolvedKey`, `SocialSubject`, `Throttled`) belongs nested in that port's own companion object (`AuthRepository.ResolvedKey`), not as a sibling file referenced by bare name. `ports/` holds one trait per file plus that trait's own nested result/error types — not free-floating data types with no home of their own.
 
 **Framework DI in a domain operation** — `ZLayer`, `@Bean`, `@Injectable` wiring belongs in app or composition root. A domain workflow may *declare* a port requirement in `R`; it never *constructs* the `ZLayer` that satisfies it.
 

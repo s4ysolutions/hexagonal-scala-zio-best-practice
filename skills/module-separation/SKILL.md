@@ -1,6 +1,6 @@
 ---
 name: module-separation
-description: Use when deciding how to split a hexagonal/clean-architecture project into build modules, when a layer violation is only caught at runtime instead of compile time, when a feature's domain is accidentally importable by another feature's infra, or when setting up a new bounded context in a multi-feature project
+description: Use when splitting a hexagonal project into build modules, when a layer violation is caught at runtime instead of compile time, when one feature's domain is accidentally importable by another feature's infra, or when setting up a new bounded context
 tags: [architecture, language-agnostic, build-system-agnostic]
 ---
 
@@ -159,9 +159,10 @@ Pattern:
 2. Merge the domain PR. Lower modules are correct and shippable.
 3. Fix presentation/product in a follow-up PR targeting only the affected callers.
 
-This is preferable to one large PR spanning all layers: the review scope is bounded, the domain change is visible on its own, and breakage in the follow-up is localized to wiring — no risk of mixing domain logic changes with presentation changes.
-
-The compiler enforces that breakage stops at the module boundary: a broken `VerbaZioHttp` cannot poison the domain module it depends on.
+Better than one PR spanning all layers: review scope is bounded, the domain change
+is visible alone, and follow-up breakage is localized to wiring. The compiler
+enforces that breakage stops at the module boundary — a broken presentation module
+cannot poison the domain it depends on.
 
 ## Common Mistakes
 

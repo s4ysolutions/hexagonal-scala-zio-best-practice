@@ -73,3 +73,8 @@ val routes =
 
 **`routesPublic` returning authenticated routes** — route/middleware split must be enforced; the compiler catches this only if auth routes have a non-`Any` environment type.
 
+## Related
+
+- `zio-http-endpoint` — the individual endpoint, route handler, error mapping, and DTO placement that `Xxx.endpoint`/`Xxx.route` (referenced above) are built from
+- `endpoint-contract-separation` — splitting the endpoint contract from the route function, and DTO naming (no `Dto` suffix)
+

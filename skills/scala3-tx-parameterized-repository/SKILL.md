@@ -109,7 +109,7 @@ transactionManager.transaction("get languages") {
 Often the actual fix isn't "make it sequential" but "don't re-fetch via the
 port at all" — if the data needed by the second/third call is already
 present in the first call's result, compute it with a pure Domain Operation
-instead (see `domain-operations-and-workflows`'s "Workflow that should be an
-Operation" mistake). The memory adapter masking this is itself worth
+instead (see `domain-operations-and-workflows`'s "Workflow re-fetches via a
+port" mistake). The memory adapter masking this is itself worth
 flagging — see `static-data-memory-adapter`.
 

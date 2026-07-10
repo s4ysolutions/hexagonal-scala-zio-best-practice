@@ -1,60 +1,51 @@
 ---
 name: domain-operations-and-workflows
-description: Use when deciding whether a piece of logic is pure or effectful, when a piece of domain logic ends up needing a mock or stub to test, when a domain workflow's R pulls in an infrastructure type instead of a domain port, or when choosing between a static function object and a ZIO service class for a workflow
+description: Use when deciding whether domain logic is pure (Operation) or effectful (Workflow), when it needs a mock or stub to test, when a workflow's R leaks an infra type instead of a domain port, or when choosing a static function object vs a ZIO service class for a workflow
 tags: [architecture, domain-modeling, language-agnostic]
 ---
 
 # Domain Operations and Workflows
 
-**Scope:** language-agnostic in principle; R/E discipline below is ZIO-concrete
+**Scope:** language-agnostic in principle; R/E discipline below is ZIO-concrete.
 
 ## Overview
 
-"Domain service" is retired as a term — it was doing double duty for both pure
-rules and I/O-touching logic, which is what causes domain layers to either
-fake purity (effects smuggled in as hidden dependencies) or collapse into the
-application layer (business rules smashed across boundaries, per Domain
-Modeling Made Functional's workflow style). Split it in two:
+"Domain service" is retired — it covered both pure rules and I/O-touching logic,
+which makes domain layers either fake purity (effects smuggled in as hidden
+dependencies) or collapse into the application layer. Split it in two:
 
-- **Domain Operation** — pure. No effect type in the signature, not even a
-  "pure" one like `UIO`. Takes value objects/entities in, returns a value
-  object/entity or a domain error out.
-- **Domain Workflow** — effectful. `ZIO[R, E, A]`. Composes Operations with
-  Ports. This is what an "effectful domain service" (e.g. a deposit rule that
-  must read a rate before applying it) actually is.
+- **Operation** — pure. No effect type in the signature, not even `UIO`. Value
+  objects/entities in, a value object/entity or domain error out.
+- **Workflow** — effectful. `ZIO[R, E, A]`. Composes Operations with ports. This
+  is what an "effectful domain service" (e.g. a deposit rule that must read a rate
+  before applying it) actually is.
 
-See `domain-value-objects` for VO construction rules and `hexagonal-feature-layout`
-for where each of these lives on disk and which imports are allowed.
-For Operation-layer construction helpers (`Validation`, `Newtype`/`Subtype`,
-`Equal`/`Ord`), see `zio-prelude-domain-patterns`.
+See `domain-value-objects` for VO construction, `hexagonal-feature-layout` for
+where each lives on disk, and `zio-prelude-domain-patterns` for Operation-layer
+helpers (`Validation`, `Newtype`/`Subtype`, `Equal`/`Ord`).
 
 ## Naming
 
-Suffix objects with `Operations` for pure logic, `Workflows` for effectful:
+Suffix `Operations` for pure logic, `Workflows` for effectful:
 
 | Object | Bucket | Signal |
 |--------|--------|--------|
 | `AuthorizationOperations` | Operation | pure, no effect type |
-| `TranslatorOperations` | Operation | pure, no effect type |
 | `AuthorizeWorkflows` | Workflow | returns `ZIO[...]` |
-| `TranslatorWorkflows` | Workflow | returns `ZIO[...]` |
 
-The suffix makes the bucket visible from the name alone — no need to read signatures. `grep *Workflows` finds all effectful domain logic; `grep *Operations` finds all pure logic.
+The suffix makes the bucket visible from the name — `grep *Workflows` finds all
+effectful domain logic, `grep *Operations` all pure logic.
 
 ## Core Rules
 
-**Domain Operation has no mutable or effectful state — dependencies are pure values.**
-An Operation may live as a top-level function, a companion/module object method, or
-a method on a class whose constructor holds only pure values (sealed enums, config
-constants, pure function types). What it must never hold is mutable state or anything
-that requires I/O to produce.
-
-When an Operation needs a policy or lookup table, prefer passing it as an explicit
-parameter and applying partially at the composition root — this keeps the function
-composable in a pipeline without threading hidden context:
+**Operation holds no mutable or effectful state — dependencies are pure values.**
+It may be a top-level function, a module-object method, or a method on a class
+whose constructor holds only pure values (sealed enums, config constants, pure
+function types). Never mutable state or anything requiring I/O to produce. When it
+needs a policy or lookup table, pass it as an explicit parameter and apply
+partially at the composition root:
 
 ```scala
-// policy as explicit parameter — partial application at the composition root
 def applyDiscount(policy: DiscountPolicy)(price: Money, code: DiscountCode): Either[PricingError, Money] = ...
 
 // composition root
@@ -62,187 +53,46 @@ val applyCompanyDiscount: (Money, DiscountCode) => Either[PricingError, Money] =
   applyDiscount(CompanyDiscountPolicy)
 ```
 
-`R` on a `ZIO` is the functional-DI mechanism for the *effectful* case (Workflows);
-explicit parameters + partial application is the functional-DI for the *pure* case (Operations).
+`R` on a `ZIO` is functional-DI for the effectful case; explicit parameters +
+partial application is functional-DI for the pure case.
 
-**Domain Operation has zero effect-type imports** — no `zio.ZIO`, `zio.Task`,
-`zio.UIO`, no `cats.effect.IO`. `zio.prelude.*` is allowed: it is algebra and
-data structures, not an effect system, so it doesn't violate the boundary.
+**Operation has zero effect-type imports** — no `zio.ZIO`/`Task`/`UIO`, no
+`cats.effect.IO`. `zio.prelude.*` is allowed: algebra and data structures, not an
+effect system.
 
-```scala
-// Operation: pure top-level function, no effect type, no injected state
-def applyDiscount(price: Money, code: DiscountCode): Either[PricingError, Money] = ...
-```
+**Workflow's `R` is `Any` or a domain port** — never an infra type
+(`DataSource`, `SttpBackend`, a JDBC type). The port trait is declared in the
+domain; `R` names that trait, never the infra type that implements it later.
+Composing two workflows unions their `R` automatically. Concrete implementations
+are provided only at the composition root (see `composition-root`).
 
-**Domain Workflow's `R` is restricted to `Any` or another domain port**
-— never an infra type directly (`DataSource`, `SttpBackend`, a JDBC type).
-This is the port-placement invariant made mechanical: if a workflow calls a
-port, the port is declared in the domain, and `R` names that domain-declared
-type — never the infra type that implements it later.
+**Workflow's `E` is the sealed domain error hierarchy plus `InfraFailure`.** Raw
+`Throwable` is banned. `InfraFailure` (in `core.domain.errors`) is expected —
+adapters convert raw exceptions into it before crossing the port boundary. `E` may
+be a union (`InfraFailure | DomainError`). This binds the **port trait** too: a
+port method typed `Task[A]` already violates the rule before any workflow touches
+it, regardless of transport (HTTP, JDBC, gRPC).
 
-```scala
-// Workflow: R names a domain port, not an infra type
-trait RateLookup:
-  def currentRate(currency: Currency): IO[RateLookupError, ExchangeRate]
+**Testing litmus test** — if testing domain logic needs a mock, stub, or
+`ZLayer.succeed(...)`, it is a Workflow, not an Operation. An Operation is tested
+by calling it with literal inputs. Reaching for a double on a supposed "domain
+service" is the signal an effect was smuggled in — re-type it as a Workflow with
+the port in `R`.
 
-def convert(amount: Money, target: Currency): ZIO[RateLookup, ConversionError, Money] = ...
-```
+The litmus also picks the test runtime: an Operation needs no effect runtime →
+plain/munit module; a Workflow drives `ZIO[R, E, A]` → effect-runtime (zio-test)
+module. See `mill-module-layout`'s test sub-module table. A domain suite pulling in
+the effect-test framework to test something with no effect type is the same
+smuggled-effect smell — move the suite, don't add the runtime dependency.
 
-Composing two workflows unions their `R` automatically — a workflow that
-calls another workflow ends up with `R` = the union of both workflows'
-ports, never wider. Concrete infra implementations of the port traits are
-provided only at the composition root, exactly as `zio-layer-composition`
-already requires.
+## Choosing the Workflow Shape
 
-**Domain Workflow's `E` is the sealed domain error hierarchy plus `InfraFailure`.**
-Raw `Throwable` is banned. `InfraFailure` (declared in `core.domain.errors`)
-is allowed and expected — adapters convert raw exceptions into it before crossing the port
-boundary, so above the port the error is typed and the workflow can reason about it normally.
-`E` may be a single type or a union (`InfraFailure | DomainError`). This applies to the
-port trait itself, not just the workflow that calls it — a port method typed `Task[A]`
-(`ZIO[Any, Throwable, A]`) already violates this rule before any workflow touches it,
-regardless of which transport (HTTP client, JDBC, gRPC, ...) the adapter wraps.
+Pick one of two shapes before writing a workflow. TX-parameterized deps
+(`UsageRepository[TX]`, `TransactionManager[TX]`) always stay explicit — the TX
+type is chosen at the use-case level, not the workflow level.
 
-**The testing litmus test** — if testing a piece of domain logic requires a
-mock, stub, or `ZLayer.succeed(...)`, it is a Workflow, not an Operation. An
-Operation is tested by calling it directly with literal inputs. Reaching for
-a double on something believed to be "just a domain service" is the signal
-that an effect was smuggled in; re-type it as a Workflow with the relevant
-port showing up in `R` rather than wiring a double around it.
-
-This classification also picks the test runtime: an Operation needs no effect
-runtime to test, so it belongs in a plain/munit test module; a Workflow needs
-one to drive its `ZIO[R, E, A]`, so it belongs in an effect-runtime (e.g.
-zio-test) test module. See `mill-module-layout`'s test sub-module table for
-the concrete module split. A domain test suite pulling in the effect-test
-framework to test something with no effect type in its signature is the same
-smuggled-effect smell as reaching for a mock — the fix is moving the suite to
-the plain-test module, not adding a runtime dependency to prove purity.
-
-## Checklist
-
-- [ ] Operation constructor (if any) holds only pure values — no ports, no services, no effectful dependencies
-- [ ] Operation dependencies (policies, lookup tables, config) are explicit parameters, composed via partial application
-- [ ] No `zio.ZIO`/`zio.Task`/effect-type import in anything called an Operation
-- [ ] Every Workflow's `R` is `Any` or a domain port type — never an infra type
-- [ ] Every Workflow's `E` is a sealed domain error type or `InfraFailure` — never raw `Throwable`
-- [ ] Nothing named "domain service" remains — it's either an Operation or a Workflow
-- [ ] No mock/stub needed to test anything classified as an Operation
-
-## Common Mistakes
-
-**Calling a Workflow a "domain service"** — the term hides which bucket the
-thing is in and invites exactly the confusion this skill exists to resolve.
-Name it Operation or Workflow.
-
-**`R` widened to an infra type "just for now"** — `ZIO[DataSource, ...]` in a
-domain workflow is the port-placement invariant broken in the type signature
-itself. Declare the port trait in the domain even if, today, there's only
-one implementation.
-
-**Reaching for `F[_]: MonadError[F, DomainError]` to "stay framework-agnostic"**
-— if every other layer in the codebase is already ZIO-committed (composition
-root, HTTP adapter, repository wrappers), this buys portability you will
-never use at the cost of tagless-final ceremony on every signature and worse
-error-handling ergonomics than ZIO's native `mapError`/`catchAll`. Stay
-concrete unless multiple effect runtimes are a real, near-term requirement.
-
-**Operation class holding a mutable or effectful dependency** — `class PricingService(repo: PricingRepository)` smuggles a port into an Operation. The fix: make it a Workflow with `repo` in `R`, not an Operation with `repo` in the constructor. A class holding a *pure value* (a `DiscountPolicy` enum, a `Map[Code, Rate]` loaded once at startup) is fine — the test: can the constructor parameter be constructed without any `ZIO`, `Future`, or I/O? If yes, it is a pure value and the class is a valid Operation carrier.
-
-**Mocking a pure function instead of re-typing it** — if a "domain service"
-needs a `ZLayer` to be testable, the fix is not a better mock, it's
-recognizing the thing has a port dependency and belongs in the Workflow
-bucket with that port in `R`.
-
-**Workflow re-fetches via a port what the caller already has** — a Workflow
-that takes a `Repository[TX]` and calls it again to derive a value from data
-the caller already fetched (or could fetch once) is doing I/O for no reason,
-and often ends up `zipPar`'d against a sibling call for "performance,"
-which is exactly the trap `scala3-tx-parameterized-repository` warns about
-(parallel calls sharing one TX/connection).
-
-```scala
-// WRONG — 3 repo round-trips; two of them (defaultLang, unknownLang) could
-// be derived from the getLangs result with zero I/O
-object LanguagesWorkflows:
-  def defaultLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
-    repo.getLang("en").map(_.getOrElse(fallback))
-  def unknownLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
-    repo.getLang("unk").map(_.getOrElse(fallback))
-  def getLanguages[TX <: TransactionContext](repo: LanguagesRepository[TX], tm: TransactionManager[TX]) =
-    tm.transaction("get languages") {
-      repo.getLangs zipPar (defaultLang(repo) zipPar unknownLang(repo))
-    }
-
-// CORRECT — one repo call; picking default/unknown from the result is pure
-object LanguagesOperations:
-  def defaultLang(langs: Chunk[Lang]): Lang =
-    langs.find(_.code == defaultCode).getOrElse(defaultFallback)
-  def unknownLang(langs: Chunk[Lang]): Lang =
-    langs.find(_.code == unknownCode).getOrElse(unknownFallback)
-
-object LanguagesWorkflows:
-  def getLanguages[TX <: TransactionContext](
-      repo: LanguagesRepository[TX],
-      tm: TransactionManager[TX]
-  ): IO[InfraFailure, LanguagesDescriptor] =
-    tm.transaction("get languages") {
-      repo.getLangs.map(langs =>
-        LanguagesDescriptor(LanguagesOperations.defaultLang(langs), LanguagesOperations.unknownLang(langs), langs)
-      )
-    }
-
-// use case — no transaction here, just calls the workflow (see "Transaction
-// Ownership Lives in the Workflow, Not the Use Case" below)
-class GetLanguagesUseCase[TX <: TransactionContext](tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
-  def apply(command: GetLanguagesCommand) =
-    LanguagesWorkflows.getLanguages(repo, tm)
-```
-
-The tell: if a Workflow's only reason to hold a port is to fetch a subset or
-derived view of data another call in the same use case already retrieves in
-full, it isn't a Workflow at all — collapse it to an Operation over the
-already-fetched value and delete the port calls. This also removes an entire
-`*Workflows` object and its test double from the codebase, not just a
-performance tweak.
-
-**Extracting workflow logic into a trait to enable test stubbing** — if a
-function calling a driven port is wrapped in a trait so callers can inject a
-stub, the stub sits at the wrong level. The driven port (`UsageRepository`,
-`TranslationGateway`, etc.) is already the test seam — stub that. A trait
-with one implementation and no infra variation is indirection with no payoff;
-collapse it to a static function in an object.
-
-```scala
-// WRONG — trait with one impl, exists only so callers can stub it;
-// caller ends up holding both the repo AND the service wrapping the same repo
-trait AuthorizeService[TX <: TransactionContext]:
-  def authorize(ctx: AuthorizeContext)(using TX): IO[InfraFailure, AuthorizeResult]
-
-// CORRECT — static function; fails with Denied so callers chain with *>
-object AuthorizeWorkflows:
-  def authorize[TX <: TransactionContext](
-      ctx: AuthorizeContext,
-      usageRepository: UsageRepository[TX]
-  )(using TX): IO[InfraFailure | AuthorizeResult.Denied, Unit] = ...
-
-// caller
-transactionManager.transaction("authorize") {
-  AuthorizeWorkflows.authorize(ctx, usageRepository)
-} *> gateway.translate(request)
-```
-
-Failing with `Denied` (instead of returning it) keeps it a distinct error kind — no
-wrapping into a caller-owned type like `TranslationError.Unauthorized`; presentation
-maps each error type to its HTTP status independently. Test seam is
-`UsageRepository[TX]` — stub it to exercise both paths; stubbing the wrapper trait
-would skip the actual authorization logic.
-
-## Static Function vs ZIO Service for Workflows
-
-When implementing a domain workflow, choose one of two shapes before writing code:
-
-**Shape A — static function object (explicit deps)**
+**Shape A — static function object (explicit deps).** Every caller supplies all
+deps. New dep = edit every caller.
 
 ```scala
 object TranslatorWorkflows:
@@ -254,54 +104,34 @@ object TranslatorWorkflows:
   ): IO[TranslationError | InfraFailure | AuthorizeResult.Denied, TranslationResponse]
 ```
 
-Every caller supplies all deps. New dep = edit every caller.
-
-**Shape B — ZIO service class (hidden deps)**
+**Shape B — ZIO service class (hidden non-TX deps).** New non-TX dep = change
+layer only, zero callers touched.
 
 ```scala
 class TranslatorWorkflows(gateways: TranslationGateways):
-  def translate[TX <: TransactionContext](
-      userId: ..., request: ...,
-      usageRepository: UsageRepository[TX],
-      transactionManager: TransactionManager[TX]
-  ): IO[TranslationError | InfraFailure | AuthorizeResult.Denied, TranslationResponse]
+  def translate[TX <: TransactionContext](...): IO[..., TranslationResponse]
 
 object TranslatorWorkflows:
-  def layer: ZLayer[TranslationGateways, Nothing, TranslatorWorkflows] =
+  val layer: ZLayer[TranslationGateways, Nothing, TranslatorWorkflows] =
     ZLayer.fromFunction(new TranslatorWorkflows(_))
 ```
 
-Non-TX deps hidden in constructor + ZLayer. New non-TX dep = change layer only,
-zero callers touched. TX-parameterized deps (`UsageRepository[TX]`,
-`TransactionManager[TX]`) cannot be hidden — they stay explicit because the TX type
-is chosen at the use-case level, not at the workflow level.
-
-**Decision rule:**
-
 | Situation | Shape |
 |-----------|-------|
-| One caller today, stable deps | A — refactor cost = 1 edit, indirection buys nothing |
+| One caller today, stable deps | A — indirection buys nothing |
 | Multiple callers OR deps likely to grow | B — one layer change protects all callers |
-| Wrapper around a single port the caller already holds | A — see "Extracting workflow logic into a trait" mistake below; B adds no value here |
+| Wrapper around a single port the caller already holds | A — B adds no value |
 
-> ⚠️ **Stop and decide.** This choice is not a detail — changing shape later touches every caller (A→B) or requires unwrapping a ZLayer (B→A). Pick deliberately based on caller count and dep volatility, not habit. The developer is responsible for the final call.
+> ⚠️ **Stop and decide.** Changing shape later touches every caller (A→B) or
+> unwraps a ZLayer (B→A). Pick on caller count and dep volatility, not habit.
 
-## Domain Logic Inside Transaction Boundaries
+## Transactions
 
-`TransactionManager.transaction` is an **atomicity boundary**, not an infra-only
-wrapper. Domain logic that must be consistent with a subsequent write belongs inside
-the same transaction — moving the analysis outside creates a TOCTOU gap (another
-transaction can mutate the data between the read and the decision).
+`TransactionManager.transaction` is an **atomicity boundary**. Domain logic that
+must be consistent with a following write belongs inside the same transaction —
+moving the read/decision outside opens a TOCTOU gap.
 
 ```scala
-// WRONG — read and update in separate transactions; race condition between them
-val count = transactionManager.transaction("read") { repo.used(...) }
-count.flatMap { n =>
-  if enoughQuota(n) then
-    transactionManager.transaction("update") { repo.add(...) }
-  else ZIO.fail(Denied(...))
-}
-
 // CORRECT — read + conditional update atomic
 transactionManager.transaction("authorize and record") {
   repo.used(...).flatMap { n =>
@@ -311,8 +141,7 @@ transactionManager.transaction("authorize and record") {
 }
 ```
 
-Because the effect inside can fail with domain errors, `transaction` must be generic
-over `E`:
+Because the body can fail with domain errors, `transaction` is generic over `E`:
 
 ```scala
 def transaction[R, E, A](log: String)(
@@ -320,66 +149,129 @@ def transaction[R, E, A](log: String)(
 ): ZIO[R, InfraFailure | E, A]
 ```
 
-This is the honest type — `InfraFailure` from begin/commit failures, `E` from the
-workflow inside. The original restricted signature (`IO[InfraFailure, A]` only)
-assumed transaction bodies are pure data fetches, which is too narrow.
+`InfraFailure` from begin/commit, `E` from the workflow inside. **Never inside a
+transaction:** long-running I/O (network, LLM, external gateways) — it holds a DB
+connection and lock for the full duration. Keep transactions to fast local port
+calls.
 
-**What must NOT go inside a transaction:** long-running I/O — network calls, LLM
-requests, external API gateways. These hold a DB connection and lock for the full
-duration. Keep transactions to fast, local port calls (DB reads/writes).
+**Ownership lives in the Workflow, not the Use Case.** The workflow takes
+`TransactionManager[TX]` as an explicit dep and calls `tm.transaction(...)` itself,
+once per atomic unit it needs. A use case that opens the transaction and passes the
+effect down gets the boundary wrong for any workflow needing more than one
+transaction, or none — only the workflow knows that shape. The use case's `apply`
+becomes a pass-through (see the "Workflow re-fetches" mistake for the full
+example).
 
-## Transaction Ownership Lives in the Workflow, Not the Use Case
+**Exception:** a use case with genuinely no business logic — one repo call, nothing
+to derive, no workflow warranted (see create-usecase's inline-orchestration
+alternative) — may call `tm.transaction(...)` directly. The moment there's a second
+repo call, an Operation over the result, or a domain error to raise, extract a
+workflow and move the transaction into it.
 
-A use case that opens the transaction and passes the open effect down into a
-Workflow gets the atomicity boundary wrong for any Workflow that needs more than
-one transaction, or none at all — the use case cannot know that shape, only the
-Workflow does. So the Workflow takes `TransactionManager[TX]` as an explicit
-dependency (same as it takes the repository) and calls `tm.transaction(...)`
-itself, once per atomic unit of work it actually needs. The use case's `apply`
-becomes a straight pass-through: build the params, call the Workflow, done.
+## Checklist
+
+- [ ] Operation constructor (if any) holds only pure values — no ports, no effectful deps
+- [ ] Operation deps (policies, lookup tables, config) are explicit parameters via partial application
+- [ ] No effect-type import in anything called an Operation
+- [ ] Every Workflow's `R` is `Any` or a domain port — never an infra type
+- [ ] Every Workflow's `E` is a sealed domain error or `InfraFailure` — never raw `Throwable`
+- [ ] Nothing named "domain service" remains
+- [ ] No mock/stub needed to test anything classified as an Operation
+
+## Common Mistakes
+
+**Calling a Workflow a "domain service"** — the term hides the bucket. Name it
+Operation or Workflow.
+
+**`R` widened to an infra type "just for now"** — `ZIO[DataSource, ...]` is the
+port-placement invariant broken in the type. Declare the port trait in the domain
+even with one implementation.
+
+**Reaching for `F[_]: MonadError[F, DomainError]` to "stay framework-agnostic"** —
+if the codebase is already ZIO-committed everywhere else, this buys portability you
+never use at the cost of tagless-final ceremony and worse error ergonomics than
+native `mapError`/`catchAll`. Stay concrete unless multiple runtimes are a
+near-term requirement.
+
+**Operation class holding a mutable/effectful dependency** —
+`class PricingService(repo: PricingRepository)` smuggles a port into an Operation.
+Fix: make it a Workflow with `repo` in `R`. A class holding a *pure value* (a
+`DiscountPolicy` enum, a `Map[Code, Rate]` loaded once) is fine. Test: can the
+constructor parameter be built without any `ZIO`/`Future`/I/O?
+
+**Wrapping a CPU-bound library call in a ZIO port reflexively** — calling a library
+is not itself a reason for an effectful port. Test: is this a stand-in for a future
+*networked* adapter, or the permanent always-local computation? A
+`KmsGateway`/`EmailGateway` earns `IO[...]` (today's fake → tomorrow's network
+call); a password hasher never becomes a network call — the hashing library *is*
+the permanent implementation. Model it as a pure Operation over a plain value
+(`PasswordHashingPolicy(hashFn, verifyFn)` built by an infra factory). If it's slow
+enough to starve the fiber runtime (Argon2 is memory-hard), that's the *calling
+Workflow's* job via `ZIO.attemptBlocking(...)` — not a reason to put ZIO in the
+Operation's signature.
+
+**Stateful port with the decision logic buried in the adapter** — a rate
+limiter/guard stays on the Workflow/Port side (an Operation may never hold mutable
+state, and cross-call state needs a shared mutable cell = infrastructure). But the
+*decision* — given current state and now, decide allow/throttle — is pure. Extract
+it:
 
 ```scala
-// WRONG — use case opens the transaction, Workflow is TX-implicit and can
-// only ever run inside exactly the one transaction the caller happened to open
-object GetLanguagesCommand:
-  class GetLanguagesUseCase[TX <: TransactionContext](
-      tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
-    def apply(command: GetLanguagesCommand) =
-      tm.transaction("get languages") {
-        repo.getLangs.map(langs => LanguagesDescriptor(...))  // repo call inlined
-                                                                // in the use case —
-                                                                // no Workflow at all
-      }
+// CORRECT — rule is a plain function, testable with literal lists; adapter is a thin shim
+object FailedLoginGuardOperations:
+  enum Result:
+    case Allowed(newHistory: List[Instant])
+    case Throttled
+  def checkAndRecord(history: List[Instant], now: Instant, limit: Int, window: Duration): Result =
+    val recent = history.filter(t => Duration.between(t, now).abs().compareTo(window) <= 0)
+    if recent.length >= limit then Result.Throttled else Result.Allowed(now :: recent)
 
-// CORRECT — Workflow owns tm, use case is a pass-through
-object LanguagesWorkflows:
-  def getLanguages[TX <: TransactionContext](
-      repo: LanguagesRepository[TX],
-      tm: TransactionManager[TX]
-  ): IO[InfraFailure, LanguagesDescriptor] =
-    tm.transaction("get languages") { repo.getLangs.map(langs => LanguagesDescriptor(...)) }
-
-object GetLanguagesCommand:
-  class GetLanguagesUseCase[TX <: TransactionContext](
-      tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
-    def apply(command: GetLanguagesCommand) =
-      LanguagesWorkflows.getLanguages(repo, tm)
+final class InMemoryFailedLoginGuard(state: Ref[Map[String, List[Instant]]], limit: Int, window: Duration):
+  def checkAndRecord(key: String): IO[Throttled, Unit] =
+    ZIO.succeed(Instant.now()).flatMap { now =>
+      state.modify { m =>
+        FailedLoginGuardOperations.checkAndRecord(m.getOrElse(key, Nil), now, limit, window) match
+          case FailedLoginGuardOperations.Result.Allowed(h) => (true, m.updated(key, h))
+          case FailedLoginGuardOperations.Result.Throttled  => (false, m)
+      }.flatMap(allowed => ZIO.fail(Throttled).unless(allowed).unit)
+    }
 ```
 
-This is the same shape already shown in "Static Function vs ZIO Service for
-Workflows" above (`transactionManager: TransactionManager[TX]` as an explicit
-Workflow param) — the WRONG example here is calling out the mistake explicitly,
-because a use case with the repo call inlined and no Workflow at all is easy to
-write by accident when the use case is small.
+Pull everything that can be pure out of the effectful shell; leave the shell
+holding only what genuinely can't be — here, the mutable cell.
 
-A Workflow that composes other Workflows may open several transactions (one per
-atomic step) or none (if it only orchestrates already-atomic calls) — that
-variability is exactly why the use case cannot own this decision; only the
-Workflow knows how many atomic units its own logic needs.
+**Workflow re-fetches via a port what the caller already has** — a Workflow that
+holds a repo only to derive a value from data another call already fetched is doing
+I/O for no reason (and often gets `zipPar`'d against a sibling on one TX — the trap
+`scala3-tx-parameterized-repository` warns about). Collapse the derivation to an
+Operation over the already-fetched value; this deletes a whole `*Workflows` object
+and its test double.
 
-**Exception:** a use case with genuinely no business logic — a single repo call,
-nothing to derive, no Workflow warranted at all (see create-usecase's "Alternative
-— no workflow, inline orchestration") — may call `tm.transaction(...)` directly.
-The moment there's a second repo call, an Operation applied to the result, or any
-domain error to raise, extract a Workflow and move the transaction into it.
+```scala
+// CORRECT — one repo call; picking default/unknown from the result is pure
+object LanguagesOperations:
+  def defaultLang(langs: Chunk[Lang]): Lang = langs.find(_.code == defaultCode).getOrElse(defaultFallback)
+  def unknownLang(langs: Chunk[Lang]): Lang = langs.find(_.code == unknownCode).getOrElse(unknownFallback)
 
+object LanguagesWorkflows:
+  def getLanguages[TX <: TransactionContext](
+      repo: LanguagesRepository[TX], tm: TransactionManager[TX]
+  ): IO[InfraFailure, LanguagesDescriptor] =
+    tm.transaction("get languages") {              // workflow owns the transaction
+      repo.getLangs.map(langs =>
+        LanguagesDescriptor(LanguagesOperations.defaultLang(langs), LanguagesOperations.unknownLang(langs), langs)
+      )
+    }
+
+// use case is a pass-through — no transaction here
+class GetLanguagesUseCase[TX <: TransactionContext](tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
+  def apply(command: GetLanguagesCommand) = LanguagesWorkflows.getLanguages(repo, tm)
+```
+
+**Extracting a workflow into a trait to enable stubbing** — if a function calling a
+driven port is wrapped in a trait so callers can inject a stub, the stub sits at the
+wrong level. The driven port (`UsageRepository`, `TranslationGateway`) is already
+the test seam — stub that. A trait with one impl and no infra variation is
+indirection with no payoff; collapse it to a static function. Fail with the domain
+error (e.g. `Denied`) rather than returning it, so presentation maps each error type
+to its own HTTP status independently.
