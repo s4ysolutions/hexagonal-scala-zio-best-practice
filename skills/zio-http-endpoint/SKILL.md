@@ -202,3 +202,13 @@ Order matters: the rightmost `@@` is the outermost layer. `BrowserLocale` applie
 
 **Middleware applied inside `routesAuth`** — middleware belongs at the composition root so all adapters share the same auth uniformly.
 
+**Hand-rolled English string duplicating a domain error's `.message`** — a domain
+error enum with a `message: Translatable` (see `module-i18n`) already carries the
+user-facing text; writing a second, hardcoded English string in the route's error
+mapper (`case MyError.Foo => BadRequest400("Some new text")`) both duplicates it and
+silently ignores the existing i18n resolution. If the error case has a `.message`,
+use it — `BadRequest400(err.message.localized)` inside a `withLocale { ... }` block
+(see "Middleware Context" above) — never a literal string. This is easy to miss
+because both compile fine; the tell is a `match` on a domain error enum where some
+branches call `.message.localized` and others don't.
+
