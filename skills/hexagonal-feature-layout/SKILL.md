@@ -25,7 +25,9 @@ domain/workflows/        ← module: feature.domain.workflows (effectful — ZIO
   ports/                 Outbound port interfaces + parameter objects grouping them
   workflows/             Effectful domain logic — ZIO[R, E, A], R = domain ports only
 app/
-  usecases/              Orchestration: calls ports, owns transaction boundaries
+  usecases/              Orchestration: builds params, calls the workflow; does
+                         not open transactions itself (see `domain-operations-and-workflows`
+                         § "Transaction Ownership Lives in the Workflow, Not the Use Case")
 infra/
   db/                    Driven adapter: persistent storage
   gateway/               Driven adapter: external APIs, third-party services
@@ -59,7 +61,7 @@ Concrete infra types are named **only** at the composition root (see `compositio
 | Thing | Layer | Reason |
 |-------|-------|--------|
 | Field validation | domain/vo | VO knows its own invariants |
-| Transaction boundary | app | orchestration is an app concern |
+| Transaction boundary | domain.workflows | the workflow knows how many atomic units its own logic needs — zero, one, or several; app cannot know this and must not open one itself (exception: a use case with no workflow at all, see `domain-operations-and-workflows`) |
 | Connection pooling | infra | implementation detail |
 | HTTP status codes | presentation | wire protocol |
 | JSON/schema annotations | presentation | serialization concern |
@@ -105,4 +107,6 @@ must live in `domain.workflows` or deeper.
 **Calling anything a "domain service"** — the term hides whether it's pure or effectful. Classify it as an operation or a workflow; see `domain-operations-and-workflows`.
 
 **App service controlling concrete TX type** — which transaction implementation is used is a composition-root decision, not an app decision.
+
+**Use case opens `tm.transaction(...)` and inlines the repo call** — no Workflow object at all, the repo call and any derived-value logic sit directly in the use case's `apply`. This both violates the transaction-ownership rule above and skips the Operation/Workflow split from `domain-operations-and-workflows` in one move — the tell is a use case body that's more than "build params, call one workflow/port, map the result."
 

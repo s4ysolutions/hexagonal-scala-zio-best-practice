@@ -162,18 +162,17 @@ which is exactly the trap `scala3-tx-parameterized-repository` warns about
 (parallel calls sharing one TX/connection).
 
 ```scala
-// WRONG — 3 repo round-trips in one use case; two of them (defaultLang,
-// unknownLang) could be derived from the getLangs result with zero I/O
+// WRONG — 3 repo round-trips; two of them (defaultLang, unknownLang) could
+// be derived from the getLangs result with zero I/O
 object LanguagesWorkflows:
   def defaultLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
     repo.getLang("en").map(_.getOrElse(fallback))
   def unknownLang[TX <: TransactionContext](repo: LanguagesRepository[TX])(using TX) =
     repo.getLang("unk").map(_.getOrElse(fallback))
-
-// use case
-transactionManager.transaction("get languages") {
-  repo.getLangs zipPar (LanguagesWorkflows.defaultLang(repo) zipPar LanguagesWorkflows.unknownLang(repo))
-}
+  def getLanguages[TX <: TransactionContext](repo: LanguagesRepository[TX], tm: TransactionManager[TX]) =
+    tm.transaction("get languages") {
+      repo.getLangs zipPar (defaultLang(repo) zipPar unknownLang(repo))
+    }
 
 // CORRECT — one repo call; picking default/unknown from the result is pure
 object LanguagesOperations:
@@ -182,12 +181,22 @@ object LanguagesOperations:
   def unknownLang(langs: Chunk[Lang]): Lang =
     langs.find(_.code == unknownCode).getOrElse(unknownFallback)
 
-// use case
-transactionManager.transaction("get languages") {
-  repo.getLangs.map(langs =>
-    LanguagesDescriptor(LanguagesOperations.defaultLang(langs), LanguagesOperations.unknownLang(langs), langs)
-  )
-}
+object LanguagesWorkflows:
+  def getLanguages[TX <: TransactionContext](
+      repo: LanguagesRepository[TX],
+      tm: TransactionManager[TX]
+  ): IO[InfraFailure, LanguagesDescriptor] =
+    tm.transaction("get languages") {
+      repo.getLangs.map(langs =>
+        LanguagesDescriptor(LanguagesOperations.defaultLang(langs), LanguagesOperations.unknownLang(langs), langs)
+      )
+    }
+
+// use case — no transaction here, just calls the workflow (see "Transaction
+// Ownership Lives in the Workflow, Not the Use Case" below)
+class GetLanguagesUseCase[TX <: TransactionContext](tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
+  def apply(command: GetLanguagesCommand) =
+    LanguagesWorkflows.getLanguages(repo, tm)
 ```
 
 The tell: if a Workflow's only reason to hold a port is to fetch a subset or
@@ -318,4 +327,59 @@ assumed transaction bodies are pure data fetches, which is too narrow.
 **What must NOT go inside a transaction:** long-running I/O — network calls, LLM
 requests, external API gateways. These hold a DB connection and lock for the full
 duration. Keep transactions to fast, local port calls (DB reads/writes).
+
+## Transaction Ownership Lives in the Workflow, Not the Use Case
+
+A use case that opens the transaction and passes the open effect down into a
+Workflow gets the atomicity boundary wrong for any Workflow that needs more than
+one transaction, or none at all — the use case cannot know that shape, only the
+Workflow does. So the Workflow takes `TransactionManager[TX]` as an explicit
+dependency (same as it takes the repository) and calls `tm.transaction(...)`
+itself, once per atomic unit of work it actually needs. The use case's `apply`
+becomes a straight pass-through: build the params, call the Workflow, done.
+
+```scala
+// WRONG — use case opens the transaction, Workflow is TX-implicit and can
+// only ever run inside exactly the one transaction the caller happened to open
+object GetLanguagesCommand:
+  class GetLanguagesUseCase[TX <: TransactionContext](
+      tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
+    def apply(command: GetLanguagesCommand) =
+      tm.transaction("get languages") {
+        repo.getLangs.map(langs => LanguagesDescriptor(...))  // repo call inlined
+                                                                // in the use case —
+                                                                // no Workflow at all
+      }
+
+// CORRECT — Workflow owns tm, use case is a pass-through
+object LanguagesWorkflows:
+  def getLanguages[TX <: TransactionContext](
+      repo: LanguagesRepository[TX],
+      tm: TransactionManager[TX]
+  ): IO[InfraFailure, LanguagesDescriptor] =
+    tm.transaction("get languages") { repo.getLangs.map(langs => LanguagesDescriptor(...)) }
+
+object GetLanguagesCommand:
+  class GetLanguagesUseCase[TX <: TransactionContext](
+      tm: TransactionManager[TX], repo: LanguagesRepository[TX]):
+    def apply(command: GetLanguagesCommand) =
+      LanguagesWorkflows.getLanguages(repo, tm)
+```
+
+This is the same shape already shown in "Static Function vs ZIO Service for
+Workflows" above (`transactionManager: TransactionManager[TX]` as an explicit
+Workflow param) — the WRONG example here is calling out the mistake explicitly,
+because a use case with the repo call inlined and no Workflow at all is easy to
+write by accident when the use case is small.
+
+A Workflow that composes other Workflows may open several transactions (one per
+atomic step) or none (if it only orchestrates already-atomic calls) — that
+variability is exactly why the use case cannot own this decision; only the
+Workflow knows how many atomic units its own logic needs.
+
+**Exception:** a use case with genuinely no business logic — a single repo call,
+nothing to derive, no Workflow warranted at all (see create-usecase's "Alternative
+— no workflow, inline orchestration") — may call `tm.transaction(...)` directly.
+The moment there's a second repo call, an Operation applied to the result, or any
+domain error to raise, extract a Workflow and move the transaction into it.
 
