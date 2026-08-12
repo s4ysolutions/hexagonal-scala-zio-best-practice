@@ -1,7 +1,8 @@
 ---
 name: zio-prelude-domain-patterns
 description: Use when constructing a domain value object or command from multiple fields, when deciding between Either and accumulating validation, when wrapping a constrained primitive type, or when default case-class equality is wrong for a domain type
-tags: [zio, domain-modeling, scala]
+metadata:
+  tags: [zio, domain-modeling, scala]
 ---
 
 # ZIO Prelude for Domain Operations
@@ -82,6 +83,9 @@ type Code = Code.Type
 val c: Code = Code("en")
 val s: String = Code.unwrap(c)
 ```
+
+For surrogate/repository IDs specifically — whether to use this form or a
+generic `Identifier[A]`, and where the ID lives — see `domain-identity-types`.
 
 The entire point is that there is **no** `Conversion[String, Code]` and no
 `CanEqual[Code, String]` — the compiler must refuse `code == "en"` and force

@@ -1,7 +1,8 @@
 ---
 name: zio-layer-composition
 description: Use when wiring ZIO ZLayer graphs, when a layer fails to compile due to missing dependencies, when deciding between ZLayer.fromFunction and ZLayer.fromZIO, or when a layer is being assembled in the wrong module
-tags: [zio, scala, dependency-injection]
+metadata:
+  tags: [zio, scala, dependency-injection]
 ---
 
 # ZIO Layer Composition
@@ -100,7 +101,7 @@ object MyService:
 
 Use when the constructor is a straightforward field injection. Use `fromFunction` / `fromZIO` when there's custom construction logic.
 
-## Rules (additions)
+## Rules
 
 **Never use `provide` for layer wiring.** `provide` auto-resolves the dependency graph by type — if two layers satisfy the same type, the selection is implicit and the error appears far from the source. Always wire explicitly with `>>>` (sequential) and `++` (additive); the graph is then visible in code and any missing dependency is a compile error at the exact wiring site.
 
@@ -111,8 +112,9 @@ Use when the constructor is a straightforward field injection. Use `fromFunction
 myApp.provide(useCaseLayer, repoLayer, txManagerLayer, dataSourceLayer)
 
 // CORRECT — explicit graph
+// `++` binds tighter than `>>>` in Scala — parenthesize each side explicitly
 val appLayer =
-  (dataSourceLayer >>> txManagerLayer ++ repoLayer) >>> useCaseLayer
+  ((dataSourceLayer >>> txManagerLayer) ++ repoLayer) >>> useCaseLayer
 myApp.provideLayer(appLayer)
 ```
 
@@ -155,6 +157,24 @@ val appLayerB =
 
 Invariant preserved: concrete infra classes (`UsersRepositoryPg`, `UsersRepositoryMemory`) named only at the product call site, not inside the companion.
 
+**Shared config: take it as input, don't embed it per branch.** If several parallel (`++`) branches each
+embed the same config layer via `>>>`, a config failure surfaces once per branch (N identical logs, not
+a double-init — memoization still builds `authConfigLayer` once). Fix by making each branch take the
+config as *input* and threading it once, sequentially, ahead of the `++`:
+
+```scala
+// BAD — every branch embeds the config layer; N failure logs for one root cause
+val kmsLayer: ZLayer[Any, E, KmsGateway]         = authConfigLayer >>> ZLayer.service[AuthConfig].flatMap { ... }
+val passwordLayer: ZLayer[Any, E, PasswordPolicy] = authConfigLayer >>> ZLayer.service[AuthConfig].flatMap { ... }
+val useCasesLayer = kmsLayer ++ passwordLayer ++ ...
+
+// GOOD — config threaded once; branches take it as input, become independently testable with a stub
+val kmsLayer: ZLayer[AuthConfig, E, KmsGateway]         = ZLayer.service[AuthConfig].flatMap { env => ... }
+val passwordLayer: ZLayer[AuthConfig, E, PasswordPolicy] = ZLayer.service[AuthConfig].flatMap { env => ... }
+val useCasesLayer: ZLayer[AuthConfig, E, ...] = kmsLayer ++ passwordLayer ++ ...
+val layer: ZLayer[Any, E, App] = authConfigLayer >>> useCasesLayer >>> App.layer  // fail-fast, one log line
+```
+
 ## Common Mistakes
 
 **Layer contains business logic** — `ZLayer.fromZIO { ... businessDecision ... }` — extraction belongs in a service method, not a layer factory.
@@ -162,6 +182,8 @@ Invariant preserved: concrete infra classes (`UsersRepositoryPg`, `UsersReposito
 **Services constructed with `new` outside any layer factory** — bypasses the DI graph; a dependency is now invisible to the compiler. Using `new` *inside* `ZLayer.fromFunction(new MyService(_))` is correct and expected.
 
 **`>>>` with incompatible types** — compiler error means the right-hand layer has a requirement the left-hand layer does not provide; check the `R` type of the downstream layer.
+
+**Parallel branches each embedding the same config layer** — N identical failure logs for one root cause; make each branch take the config as input instead (see above).
 
 **`provide` / `provideSomeLayer` for graph wiring** — banned (the sole exception is the local `.provide(ZLayer.succeed(x))` over an already-constructed value, per "The one allowed exception" above). `provideSomeLayer` inside a use case is doubly wrong: use cases must not self-wire, and auto-resolution hides dependency bugs. Wire the graph with explicit `>>>` / `++` at the composition root only.
 

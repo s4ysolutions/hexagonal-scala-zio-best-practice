@@ -21,7 +21,7 @@ skills/
 `SKILL.md` frontmatter fields that matter:
 - `name` — machine identifier, must match directory name
 - `description` — used by Claude to decide when to invoke this skill; write it as trigger conditions, not a summary
-- `tags` — searchable labels
+- `metadata.tags` — searchable labels (array, under the `metadata` key)
 
 ## Skill Relationships
 
@@ -42,6 +42,8 @@ Domain model spine:
 domain-value-objects           ← VOs, typed errors, layer-pure types
   ↓ uses
 zio-prelude-domain-patterns    ← Validation vs Either, Subtype/Newtype, Equal/Ord
+  ↓ specializes for identity
+domain-identity-types          ← ID type shape; Identified[Id, E]; carry/resolve/construct
   ↓ governs
 domain-operations-and-workflows ← pure Operation vs effectful Workflow; R/E discipline
 ```
@@ -53,6 +55,11 @@ composition-root               ← single wiring point; concrete types named now
 zio-layer-composition          ← ZLayer grammar (>>>, ++, fromFunction vs fromZIO)
   ↓ use case boundary
 usecase-command                ← Command + UseCase[C] abstraction; TX-agnostic presentation
+```
+
+Scaffolding entry point:
+```
+create-usecase                 ← end-to-end walkthrough; drives the spines above when adding a use case
 ```
 
 Frontend spine (Scala.js — a separate hexagon, NOT the backend patterns):
@@ -90,6 +97,7 @@ Each cross-skill rule has one owner skill that states it in full; every other sk
 | Concrete types only at composition root | `composition-root` |
 | `provide` ban + its exception | `zio-layer-composition` |
 | DTO naming (no `Dto` suffix) | `endpoint-contract-separation` |
+| ID type shape + where the ID lives (`Identified` vs field) | `domain-identity-types` |
 
 ## Editing Skills
 

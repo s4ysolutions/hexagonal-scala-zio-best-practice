@@ -1,7 +1,8 @@
 ---
 name: scala3-tx-parameterized-repository
 description: Use when designing repository ports in Scala 3 that must remain testable with in-memory or real-DB implementations, or when a repository is leaking a concrete connection type into the domain or application layer
-tags: [scala, scala3, architecture, database]
+metadata:
+  tags: [scala, scala3, architecture, database]
 ---
 
 # TX-Parameterized Repository (Scala 3)
@@ -53,6 +54,8 @@ Application code calls `tm.transaction { repo.findById(...) }` — it never cons
 ## Rules
 
 - `TX` type parameter appears only in domain ports and their infra implementations
+- ID parameters are typed (`UserId`, not `UUID`), and results that carry a
+  surrogate ID use `Identified[Id, E]` — see `domain-identity-types`
 - Application use cases receive `TransactionManager[TX]` and `Repository[TX]` — both abstract
 - `TransactionContextPg` / concrete TX types are named **only** in:
   - Infra adapter implementations

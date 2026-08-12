@@ -57,12 +57,19 @@ cp -r skills/<skill-name> ~/.claude/skills/
 | [endpoint-contract-separation](skills/endpoint-contract-separation/SKILL.md) | OpenAPI endpoint definition separate from route handler |
 | [static-data-memory-adapter](skills/static-data-memory-adapter/SKILL.md) | In-memory adapter for static/read-only data, avoids DB overhead |
 
+### Workflows
+
+| Skill | Purpose |
+|-------|---------|
+| [create-usecase](skills/create-usecase/SKILL.md) | end-to-end scaffold of a new use case: command, domain workflow, use case class, layer, composition root registration |
+
 ### Scala-Specific
 
 | Skill | Purpose |
 |-------|---------|
 | [mill-module-layout](skills/mill-module-layout/SKILL.md) | Mill `build.mill` idioms for the module-separation layout; `moduleDeps`, test sub-modules, base traits |
 | [scala3-tx-parameterized-repository](skills/scala3-tx-parameterized-repository/SKILL.md) | `Repository[TX <: TransactionContext]` with `using ctx: TX` context params |
+| [domain-identity-types](skills/domain-identity-types/SKILL.md) | per-entity ID newtype vs generic `Identifier[A]`, `Identified[Id, E]` for saved/unsaved, carry/resolve/construct rule |
 | [module-i18n](skills/module-i18n/SKILL.md) | `private[pkg] given translationResolver`, `t"..."` interpolator per layer |
 
 ### ZIO-Specific

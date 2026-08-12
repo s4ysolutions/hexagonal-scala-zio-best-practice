@@ -1,7 +1,8 @@
 ---
 name: module-separation
 description: Use when splitting a hexagonal project into build modules, when a layer violation is caught at runtime instead of compile time, when one feature's domain is accidentally importable by another feature's infra, or when setting up a new bounded context
-tags: [architecture, language-agnostic, build-system-agnostic]
+metadata:
+  tags: [architecture, language-agnostic, build-system-agnostic]
 ---
 
 # Module Separation for Hexagonal Architecture
@@ -37,7 +38,7 @@ module so features can depend on exactly what they need:
 ```
 core/
   i18n/                  ← translation resolver, interpolator, Translatable
-  identity/              ← generic Identifier / Identified types
+  identity/              ← Identified[Id, E] wrapper + shared ID base (see domain-identity-types)
   tx/                    ← TransactionContext + TransactionManager traits (depends on ZIO)
   domain/
     errors/              ← InfraFailure (typed error wrapper; no ZIO dep — pure domain can import)

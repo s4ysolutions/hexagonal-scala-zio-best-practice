@@ -1,7 +1,8 @@
 ---
 name: domain-operations-and-workflows
 description: Use when deciding whether domain logic is pure (Operation) or effectful (Workflow), when it needs a mock or stub to test, when a workflow's R leaks an infra type instead of a domain port, or when choosing a static function object vs a ZIO service class for a workflow
-tags: [architecture, domain-modeling, language-agnostic]
+metadata:
+  tags: [architecture, domain-modeling, language-agnostic]
 ---
 
 # Domain Operations and Workflows
@@ -21,8 +22,9 @@ dependencies) or collapse into the application layer. Split it in two:
   before applying it) actually is.
 
 See `domain-value-objects` for VO construction, `hexagonal-feature-layout` for
-where each lives on disk, and `zio-prelude-domain-patterns` for Operation-layer
-helpers (`Validation`, `Newtype`/`Subtype`, `Equal`/`Ord`).
+where each lives on disk, `zio-prelude-domain-patterns` for Operation-layer
+helpers (`Validation`, `Newtype`/`Subtype`, `Equal`/`Ord`), and
+`domain-identity-types` for which side may hold a repository ID.
 
 ## Naming
 

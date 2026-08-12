@@ -1,7 +1,8 @@
 ---
 name: hexagonal-feature-layout
 description: Use when structuring a bounded context with multiple adapters, when deciding where a class or function belongs, or when reviewing for layer violations such as framework imports in domain code or infrastructure types in application services
-tags: [architecture, language-agnostic, framework-agnostic]
+metadata:
+  tags: [architecture, language-agnostic, framework-agnostic]
 ---
 
 # Hexagonal Feature Layout

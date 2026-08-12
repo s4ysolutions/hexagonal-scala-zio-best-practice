@@ -1,7 +1,8 @@
 ---
 name: zio-http-endpoint
 description: Use when adding a new HTTP endpoint to a feature adapter, when mapping domain errors to HTTP status codes, when deciding where DTOs live, or when wiring middleware context (Locale, authenticated user) inside a route
-tags: [zio, zio-http, scala, http, presentation]
+metadata:
+  tags: [zio, zio-http, scala, http, presentation]
 ---
 
 # ZIO-HTTP Endpoint + Route Pattern

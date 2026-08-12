@@ -1,7 +1,8 @@
 ---
 name: ui-component-container-pattern
 description: Use when a Scala.js/Laminar feature section grows past one leaf component and needs an entry point, when deciding where a group of related UI components belongs, or when a top-level file like Main.scala accumulates inlined section content to extract
-tags: [scala, scalajs, laminar, frontend, ui]
+metadata:
+  tags: [scala, scalajs, laminar, frontend, ui]
 ---
 
 # UI Component Container Pattern

@@ -1,7 +1,8 @@
 ---
 name: layers-to-modules
 description: Use when deciding how many build modules a hexagonal layer maps to, when creating or naming a domain sub-module (domain.operations, domain.workflows), or when a domain module pulls in ZIO and you want to know if that is correct
-tags: [architecture, language-agnostic, build-system-agnostic]
+metadata:
+  tags: [architecture, language-agnostic, build-system-agnostic]
 ---
 
 # Mapping Hexagonal Layers to Build Modules

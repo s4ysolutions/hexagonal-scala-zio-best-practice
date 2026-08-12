@@ -1,7 +1,8 @@
 ---
 name: composition-root
 description: Use when wiring adapters together, when deciding where to instantiate concrete infrastructure types, or when a module imports a concrete database/framework class and it feels wrong
-tags: [architecture, language-agnostic, framework-agnostic]
+metadata:
+  tags: [architecture, language-agnostic, framework-agnostic]
 ---
 
 # Composition Root

@@ -1,7 +1,8 @@
 ---
 name: endpoint-contract-separation
 description: Use when building HTTP APIs with OpenAPI generation, when a route handler is growing schema definitions, or when endpoint metadata and handler logic are mixed in the same function
-tags: [http, openapi, architecture, language-agnostic]
+metadata:
+  tags: [http, openapi, architecture, language-agnostic]
 ---
 
 # Endpoint Contract Separation

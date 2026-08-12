@@ -1,7 +1,8 @@
 ---
 name: frontend-usecase-airstream-bridge
 description: Use when a Scala.js frontend use case must turn a ZIO effect into an Airstream Signal/EventStream for Laminar UI, when choosing among the reactive bridging strategies (imperative Var, one-shot fromFuture, EventBus pipeline), or when deciding whether launching a ZIO fiber per UI event is too expensive
-tags: [scala, scalajs, zio, airstream, frontend]
+metadata:
+  tags: [scala, scalajs, zio, airstream, frontend]
 ---
 
 # Frontend Use Case: ZIO → Airstream Bridge

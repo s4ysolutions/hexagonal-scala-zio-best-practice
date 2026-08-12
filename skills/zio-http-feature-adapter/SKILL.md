@@ -1,7 +1,8 @@
 ---
 name: zio-http-feature-adapter
 description: Use when building a ZIO-HTTP driving adapter for a bounded context, when deciding how to expose endpoints to OpenAPI generation, or when separating public from authenticated routes in zio-http
-tags: [zio, zio-http, scala, http, architecture]
+metadata:
+  tags: [zio, zio-http, scala, http, architecture]
 ---
 
 # ZIO-HTTP Feature Adapter Pattern

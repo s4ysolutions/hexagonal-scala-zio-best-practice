@@ -1,7 +1,8 @@
 ---
 name: mill-module-layout
 description: Use when setting up, extending, or scaffolding a Mill build for a hexagonal Scala project — new modules, declaring moduleDeps, adding a test sub-module, wiring a bounded context, or cross-compiling a module to Scala.js via a nested "twin" module
-tags: [mill, scala, build-tool, architecture]
+metadata:
+  tags: [mill, scala, build-tool, architecture]
 ---
 
 # Mill Module Layout for Hexagonal Architecture

@@ -1,7 +1,8 @@
 ---
 name: create-usecase
-description: Use when asked to create, scaffold, or add a new use case, feature endpoint, or application service. Covers the full vertical slice from command definition through domain workflow, use case class, layer wiring, and composition root registration.
-tags: [architecture, scala, zio, scaffold]
+description: Use when asked to create, scaffold, or add a new use case, feature endpoint, or application service.
+metadata:
+  tags: [architecture, scala, zio, scaffold]
 ---
 
 # Create a Use Case — Full Vertical Slice

@@ -1,7 +1,8 @@
 ---
 name: module-i18n
 description: Use when adding localized strings to a Scala 3 module, auditing i18n resource files for unused or cross-module keys, or when choosing between ResourcesStringsResolver and ResourcesBundleResolver
-tags: [scala, scala3, i18n, architecture]
+metadata:
+  tags: [scala, scala3, i18n, architecture]
 ---
 
 # Module I18n (Scala 3)

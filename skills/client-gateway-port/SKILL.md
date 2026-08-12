@@ -1,7 +1,8 @@
 ---
 name: client-gateway-port
 description: Use when a Scala.js frontend needs to call a backend HTTP endpoint and turn the response into domain objects, when designing the frontend half of a hexagon, or when deciding whether a client-side data-fetch abstraction needs a transaction parameter
-tags: [scala, scalajs, architecture, http, frontend]
+metadata:
+  tags: [scala, scalajs, architecture, http, frontend]
 ---
 
 # Client Gateway Port (Frontend Hexagon)

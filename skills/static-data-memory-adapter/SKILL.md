@@ -1,7 +1,8 @@
 ---
 name: static-data-memory-adapter
 description: Use when a repository port holds data that never changes at runtime (configuration lists, enumerations, static reference tables), or when a test needs a fast in-memory substitute for a persistence adapter
-tags: [architecture, testing, language-agnostic]
+metadata:
+  tags: [architecture, testing, language-agnostic]
 ---
 
 # Static Data Memory Adapter

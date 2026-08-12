@@ -1,7 +1,8 @@
 ---
 name: usecase-command
 description: Use when designing the boundary between presentation and application layers, when a route or controller is growing business logic, or when a use case is tightly coupled to a specific transport or persistence technology
-tags: [architecture, language-agnostic, framework-agnostic]
+metadata:
+  tags: [architecture, language-agnostic, framework-agnostic]
 ---
 
 # Use Case / Command Pattern

@@ -1,7 +1,8 @@
 ---
 name: per-feature-sql-migrations
 description: Use when setting up database migrations for a project with multiple bounded contexts, when deciding how to version schema changes, or when setting up pgTAP contract tests for stored procedures
-tags: [database, sqitch, postgresql, language-agnostic]
+metadata:
+  tags: [database, sqitch, postgresql, language-agnostic]
 ---
 
 # Per-Feature SQL Migrations (Sqitch)

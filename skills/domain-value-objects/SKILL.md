@@ -1,7 +1,8 @@
 ---
 name: domain-value-objects
 description: Use when modelling domain concepts, when deciding where validation logic lives, when a domain type carries framework annotations, or when raw exceptions bubble up from infrastructure code
-tags: [architecture, domain-modeling, language-agnostic]
+metadata:
+  tags: [architecture, domain-modeling, language-agnostic]
 ---
 
 # Domain Value Objects

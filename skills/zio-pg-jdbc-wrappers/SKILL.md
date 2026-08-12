@@ -1,7 +1,8 @@
 ---
 name: zio-pg-jdbc-wrappers
 description: Use when writing PostgreSQL adapter methods in a ZIO application, when raw JDBC needs to be wrapped in ZIO effects with proper resource management, or when choosing between plain and effectful result mappers
-tags: [zio, scala, postgresql, jdbc, database]
+metadata:
+  tags: [zio, scala, postgresql, jdbc, database]
 ---
 
 # ZIO PostgreSQL JDBC Wrappers
