@@ -86,18 +86,34 @@ their invariants genuinely differ.
 
 ## Rule 2 — `Identifier[A]` is the standing convention
 
+`A` is the concept the ID points at (Rule 1). The **wrapped value type is
+whatever the storage layer actually assigns** — `UUID`, `Long`/bigint,
+whatever a DB sequence or `INSERT RETURNING` produces in this project. Do not
+default to `UUID`; check the PK column type first. Parameterize on it too, or
+fix it per-project if the whole schema shares one PK type:
+
 ```scala
 // core/identity — the only place that names Identifier
-final class Identifier[A] private (val value: UUID):
+// V = the raw value type this project's repositories assign (UUID, Long, ...)
+final class Identifier[A, V] private (val value: V):
   override def equals(that: Any): Boolean = that match
-    case other: Identifier[?] => value == other.value
-    case _                    => false
+    case other: Identifier[?, ?] => value == other.value
+    case _                       => false
   override def hashCode: Int = value.hashCode
 
 private[identity] object Identifier:
-  def unsafe[A](value: UUID): Identifier[A] = new Identifier(value)
+  def unsafe[A, V](value: V): Identifier[A, V] = new Identifier(value)
 
-given [A]: Schema[Identifier[A]] = Schema[UUID].transform(...)   // one given, every ID
+given [A]: Schema[Identifier[A, Long]] = Schema[Long].transform(...)   // this project: bigint PKs
+```
+
+If every entity in the project shares one PK type (the common case), drop the
+second parameter and fix `V` directly — don't carry unused generality:
+
+```scala
+final class Identifier[A] private (val value: Long):   // this project: all PKs are bigint
+  ...
+given [A]: Schema[Identifier[A]] = Schema[Long].transform(...)
 ```
 
 Not a `case class`: `apply`, `copy` and `unapply` would all be public mints,
@@ -107,7 +123,12 @@ and Rule 4 could not be enforced. The private constructor is what makes
 This codebase parameterizes every surrogate ID this way rather than a plain
 `Newtype` per entity — one `Schema` and one `Equal` cover all IDs, and the generic shape composes directly with
 `ZEnvironment` keys (`Identifier[AuthenticatedUser]`) and generic port/repo
-signatures. `A` is the concept the ID points at (Rule 1) — never a projection.
+signatures.
+
+A wire format that already fixes the value type (an existing auth token
+carrying a `Long` user id, a legacy API returning string IDs) wins over this
+rule — don't migrate a working wire format to fit the skill. Match `V` to
+what's already on the wire, not the other way around.
 
 **Never write `Identifier[X]` at a use site — always the alias:**
 
@@ -190,6 +211,7 @@ separate object that only presentation and infra import:
 
 ```scala
 // infra/identity or presentation/identity — NOT importable from domain
+// (UUID here for illustration only — parse whatever V actually is, e.g. raw.toLongOption)
 object TagIdParser:
   def parse(raw: String): Either[InvalidTagId, TagId] =
     Try(UUID.fromString(raw)).toOption
@@ -197,7 +219,7 @@ object TagIdParser:
       .toRight(InvalidTagId(raw))
 
 // infra adapter, on INSERT RETURNING
-val newId: TagId = Identifier.unsafe[Tag](generatedUuid)
+val newId: TagId = Identifier.unsafe[Tag](generatedId)
 ```
 
 Both call sites live outside `core.identity`'s domain-visible package, so a
@@ -229,8 +251,9 @@ Sort by a domain field. Add `Ord` only for a stated domain reason.
 ## Rule 6 — IDs in error payloads, never in translated text
 
 `TagError.NotFound(id)` is a correct domain error: presentation needs the ID to
-choose a status and to log. A UUID must never reach a `Translatable`
-interpolation — users cannot act on it. See `module-i18n`.
+choose a status and to log. A raw ID value (UUID, bigint, whatever the wire
+format is) must never reach a `Translatable` interpolation — users cannot act
+on it. See `module-i18n`.
 
 ## Erasure
 
